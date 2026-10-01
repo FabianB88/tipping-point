@@ -31,7 +31,7 @@ TP.FYS = {
 };
 
 // Hitbox van een renner, voeten op (x, y).
-TP.RENNER = { breedte: 76, hoogte: 180 };
+TP.RENNER = { breedte: 84, hoogte: 200 };
 
 TP.CAMERA = { vooruit: 340, volgX: 11, volgY: 7, zoomMin: 0.3, zoomMax: 0.45, zoomSnelheid: 0.9, frontMarge: 0 };
 

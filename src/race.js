@@ -2,7 +2,7 @@
 // items, vijanden, HUD. Wie uit beeld raakt, is gepakt.
 window.TP = window.TP || {};
 
-const RENNER_SCHAAL_HOOGTE = 180;   // beeldhoogte van een staand personage in px
+const RENNER_SCHAAL_HOOGTE = 200;   // beeldhoogte van een staand personage in px
 
 TP.Race = class extends Phaser.Scene {
   constructor() { super('Race'); }
@@ -132,7 +132,13 @@ TP.Race = class extends Phaser.Scene {
       this.anims.create({ key: p + '_ren', frames: this.anims.generateFrameNumbers(p + '_ren'), frameRate: 14, repeat: -1 });
     }
     if (!TP.heeft(rol + '_ref') && rol !== 'vos') beeld.tint = TP.ROLLEN[rol].tint;
-    beeld.naam = this.wereldObject(this.add.text(r.x, r.y - 175, r.isSpeler ? '' : r.naam, { fontFamily: TP.FONT, fontSize: '26px', color: '#fff4dc', stroke: '#2a1a0c', strokeThickness: 5 }).setOrigin(0.5).setDepth(10));
+    beeld.naam = this.wereldObject(this.add.text(r.x, r.y - 175, r.isSpeler ? 'JIJ' : r.naam, { fontFamily: TP.FONT, fontSize: r.isSpeler ? '34px' : '26px', color: r.isSpeler ? '#ffd23f' : '#fff4dc', stroke: '#2a1a0c', strokeThickness: 6 }).setOrigin(0.5).setDepth(10));
+    if (r.isSpeler) {
+      // duidelijk wie jij bent: gouden pijl boven je hoofd en een gouden gloed onder je voeten
+      beeld.pijl = this.wereldObject(this.add.triangle(r.x, r.y - 230, 0, 0, 44, 0, 22, 30, 0xffd23f).setStrokeStyle(4, 0x2a1a0c).setOrigin(0.5, 0).setDepth(10));
+      beeld.gloed = this.wereldObject(this.add.ellipse(r.x, r.y, 150, 40, 0xffd23f, 0.35).setDepth(7));
+      beeld.schaduw.setFillStyle(0x000000, 0.2);
+    }
     return beeld;
   }
 
@@ -595,7 +601,7 @@ TP.Race = class extends Phaser.Scene {
     if (r.kijk && r.kijk.sprite) {
       const s = r.kijk.sprite;
       this.tweens.add({ targets: s, alpha: 0, angle: -60, y: s.y - 80, duration: 450, onComplete: () => s.setVisible(false) });
-      r.kijk.naam && r.kijk.naam.setVisible(false); r.kijk.schaduw && r.kijk.schaduw.setVisible(false);
+      r.kijk.naam && r.kijk.naam.setVisible(false); r.kijk.schaduw && r.kijk.schaduw.setVisible(false); r.kijk.pijl && r.kijk.pijl.setVisible(false); r.kijk.gloed && r.kijk.gloed.setVisible(false);
     }
     this.fx.rook && this.fx.rook.emitParticleAt(r.x, r.y - 60, 10);
     this.geluid.speel(r.isSpeler ? 'dood' : 'uit');
@@ -716,6 +722,8 @@ TP.Race = class extends Phaser.Scene {
     if (r.t.verdoofd > 0) s.setTint(Math.floor(this.tijd * 20) % 2 ? 0xff9977 : basisTint); else if (r.t.bevroren > 0) s.setTint(0x9fd8ff); else if (r.t.traag > 0 || r.t.grip > 0) s.setTint(0xffe27a); else if (r.t.boost > 0 || r.t.dash > 0) s.setTint(0xfff0c0); else s.setTint(basisTint);
     if (k.schaduw) { const g = this.baan.grondOnder(r.x, r.y, 0, 600, false); k.schaduw.setPosition(r.x, g ? g.y : r.y).setVisible(!!g).setScale(1 - Math.min(0.5, (g ? g.y - r.y : 0) / 1000), 1); }
     if (k.naam) k.naam.setPosition(r.x, r.y - r.hoogte - 30);
+    if (k.pijl) { k.pijl.setPosition(r.x, r.y - r.hoogte - 100 + Math.sin(this.tijd * 6) * 8); k.pijl.setVisible(!r.dood); }
+    if (k.gloed) { const g = this.baan.grondOnder(r.x, r.y, 0, 600, false); k.gloed.setPosition(r.x, g ? g.y : r.y).setVisible(!r.dood && !!g).setAlpha(0.25 + Math.sin(this.tijd * 5) * 0.1); }
     if (r.slidet && r.opGrond && this.fx.slideStof && Math.random() < 0.6) this.fx.slideStof.emitParticleAt(r.x - r.richting * 20, r.y, 1);
     if ((r.t.boost > 0 || r.t.dash > 0 || Math.abs(r.vx) > 1250) && this.fx.strepen && Math.random() < 0.7) this.fx.strepen.emitParticleAt(r.x - r.richting * 40, r.y - 60 - Math.random() * 60, 1);
     if (r.opGrond && Math.abs(r.vx) > 300 && this.fx.stof && Math.random() < 0.12) this.fx.stof.emitParticleAt(r.x - r.richting * 30, r.y, 1);
