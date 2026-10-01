@@ -22,9 +22,13 @@ Chat "Maak game assets zipbestand". 24 beelden staan in het Uitvoer-paneel (fx_s
 
 Chat "Tegels maken zippen". Tien stukken in `assets/gpt/batch4`: `tegel_grond`, `tegel_vulling`, `tegel_muur`, `tegel_plafond`, `tegel_platform`, `tegel_platform_links|rechts`, `tegel_rand_links|rechts`, `tegel_helling`. Deze winnen van de uit het blad geknipte stukken (batch 4 > batch 2 in assets.py). Nog controleren in het spel of de naden echt onzichtbaar zijn.
 
+## Batch 5: uil — AANGEVRAAGD (2026-10-02, 00:07 na de dagreset)
+
+Nieuwe chat op chatgpt.com, Work-modus, model GPT-5.6 Sol (de standaard GPT-6 Astra is bewust uitgezet). `vos_ref.png` als stijlreferentie meegestuurd. Gevraagd: `uil_ref`, `uil_ren_1..6`, `uil_sprong`, `uil_val`, `uil_slide`, `uil_muur`, `uil_slinger`, `uil_geraakt`, `uil_winst` in `tipping-point-batch5-uil.zip`. Daarna op dezelfde manier bever (batch 6) en ijsbeer (batch 7). De engine pakt `<rol>_ref` en `<rol>_ren` automatisch op zodra assets.py gedraaid is.
+
 ## Nog niet aangevraagd
 
-Uil, bever, ijsbeer en raptor (prompts A4 t/m A7 in GPT-PROMPTS.md); industrieterrein, kust en oertijd (C2 t/m C4, D, E, F); portretten (G4); vijanden triceratops en pterosaurus. Tot de dieren er zijn krijgen de bots de vos met een eigen kleurzweem (`TP.ROLLEN.*.tint`).
+Bever, ijsbeer en raptor (prompts A5 t/m A7 in GPT-PROMPTS.md); industrieterrein, kust en oertijd (C2 t/m C4, D, E, F); portretten (G4); vijanden triceratops en pterosaurus. Tot de dieren er zijn krijgen de bots de vos met een eigen kleurzweem (`TP.ROLLEN.*.tint`).
 
 ## Gratis packs
 

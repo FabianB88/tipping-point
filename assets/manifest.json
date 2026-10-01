@@ -12,7 +12,7 @@
    "h": 1024,
    "laag": true,
    "pad": "spel/bos_dichtbij.png",
-   "v": 1790878850
+   "v": 1790894542
   },
   "bos_krat": {
    "w": 805,
@@ -26,14 +26,14 @@
    "h": 1024,
    "laag": true,
    "pad": "spel/bos_lucht.png",
-   "v": 1790878856
+   "v": 1790894550
   },
   "bos_midden": {
    "w": 2704,
    "h": 1024,
    "laag": true,
    "pad": "spel/bos_midden.png",
-   "v": 1790878857
+   "v": 1790894552
   },
   "bos_obstakel_1": {
    "w": 989,
@@ -89,14 +89,14 @@
    "h": 1024,
    "laag": true,
    "pad": "spel/bos_ver.png",
-   "v": 1790878859
+   "v": 1790894555
   },
   "bos_voor": {
    "w": 2704,
    "h": 1024,
    "laag": true,
    "pad": "spel/bos_voor.png",
-   "v": 1790878861
+   "v": 1790894557
   },
   "front_bos": {
    "w": 787,
@@ -111,7 +111,7 @@
    "frames": 8,
    "sheet": true,
    "pad": "spel/fx_boost.png",
-   "v": 1790878862
+   "v": 1790894558
   },
   "fx_explosie": {
    "w": 315,
@@ -119,7 +119,7 @@
    "frames": 8,
    "sheet": true,
    "pad": "spel/fx_explosie.png",
-   "v": 1790878862
+   "v": 1790894558
   },
   "fx_gifbel": {
    "w": 314,
@@ -127,7 +127,7 @@
    "frames": 8,
    "sheet": true,
    "pad": "spel/fx_gifbel.png",
-   "v": 1790878862
+   "v": 1790894559
   },
   "fx_gifwolk": {
    "w": 315,
@@ -135,7 +135,7 @@
    "frames": 8,
    "sheet": true,
    "pad": "spel/fx_gifwolk.png",
-   "v": 1790878863
+   "v": 1790894559
   },
   "fx_inslag": {
    "w": 316,
@@ -143,7 +143,7 @@
    "frames": 8,
    "sheet": true,
    "pad": "spel/fx_inslag.png",
-   "v": 1790878863
+   "v": 1790894560
   },
   "fx_plons": {
    "w": 315,
@@ -151,7 +151,7 @@
    "frames": 8,
    "sheet": true,
    "pad": "spel/fx_plons.png",
-   "v": 1790878863
+   "v": 1790894560
   },
   "fx_rook": {
    "w": 314,
@@ -159,7 +159,7 @@
    "frames": 8,
    "sheet": true,
    "pad": "spel/fx_rook.png",
-   "v": 1790878864
+   "v": 1790894561
   },
   "fx_stof": {
    "w": 315,
@@ -167,7 +167,7 @@
    "frames": 8,
    "sheet": true,
    "pad": "spel/fx_stof.png",
-   "v": 1790878864
+   "v": 1790894562
   },
   "fx_vuur": {
    "w": 238,
@@ -175,7 +175,7 @@
    "frames": 8,
    "sheet": true,
    "pad": "spel/fx_vuur.png",
-   "v": 1790878865
+   "v": 1790894562
   },
   "item_eikel": {
    "w": 855,
@@ -282,6 +282,62 @@
    "pad": "spel/ui_plekken.png",
    "v": 1790874747
   },
+  "uil_geraakt": {
+   "w": 825,
+   "h": 900,
+   "bron": "gpt/batch5/uil_geraakt.png",
+   "pad": "spel/uil_geraakt.png",
+   "v": 1790894121
+  },
+  "uil_muur": {
+   "w": 919,
+   "h": 860,
+   "bron": "gpt/batch5/uil_muur.png",
+   "pad": "spel/uil_muur.png",
+   "v": 1790894121
+  },
+  "uil_ref": {
+   "w": 699,
+   "h": 912,
+   "bron": "gpt/batch5/uil_ref.png",
+   "pad": "spel/uil_ref.png",
+   "v": 1790894122
+  },
+  "uil_slide": {
+   "w": 868,
+   "h": 460,
+   "bron": "gpt/batch5/uil_slide.png",
+   "pad": "spel/uil_slide.png",
+   "v": 1790894564
+  },
+  "uil_slinger": {
+   "w": 920,
+   "h": 814,
+   "bron": "gpt/batch5/uil_slinger.png",
+   "pad": "spel/uil_slinger.png",
+   "v": 1790894123
+  },
+  "uil_sprong": {
+   "w": 920,
+   "h": 858,
+   "bron": "gpt/batch5/uil_sprong.png",
+   "pad": "spel/uil_sprong.png",
+   "v": 1790894124
+  },
+  "uil_val": {
+   "w": 659,
+   "h": 900,
+   "bron": "gpt/batch5/uil_val.png",
+   "pad": "spel/uil_val.png",
+   "v": 1790894125
+  },
+  "uil_winst": {
+   "w": 758,
+   "h": 900,
+   "bron": "gpt/batch5/uil_winst.png",
+   "pad": "spel/uil_winst.png",
+   "v": 1790894125
+  },
   "vijand_bulldozer": {
    "w": 932,
    "h": 762,
@@ -387,167 +443,175 @@
    "pad": "spel/vos_winst.png",
    "v": 1790851885
   },
+  "uil_ren": {
+   "w": 939,
+   "h": 867,
+   "frames": 6,
+   "sheet": true,
+   "pad": "spel/uil_ren.png",
+   "v": 1790894569
+  },
   "vos_ren": {
    "w": 885,
    "h": 852,
    "frames": 6,
    "sheet": true,
    "pad": "spel/vos_ren.png",
-   "v": 1790878868
+   "v": 1790894573
   },
   "ui_knop": {
    "w": 687,
    "h": 269,
    "bron": "gpt/batch3/ui_knoppen.png",
    "pad": "spel/ui_knop.png",
-   "v": 1790878868
+   "v": 1790894573
   },
   "ui_knop_in": {
    "w": 688,
    "h": 269,
    "bron": "gpt/batch3/ui_knoppen.png",
    "pad": "spel/ui_knop_in.png",
-   "v": 1790878869
+   "v": 1790894573
   },
   "ui_rond": {
    "w": 345,
    "h": 271,
    "bron": "gpt/batch3/ui_knoppen.png",
    "pad": "spel/ui_rond.png",
-   "v": 1790878869
+   "v": 1790894573
   },
   "ui_rond_in": {
    "w": 344,
    "h": 271,
    "bron": "gpt/batch3/ui_knoppen.png",
    "pad": "spel/ui_rond_in.png",
-   "v": 1790878869
+   "v": 1790894574
   },
   "ui_paneel": {
    "w": 791,
    "h": 298,
    "bron": "gpt/batch3/ui_knoppen.png",
    "pad": "spel/ui_paneel.png",
-   "v": 1790878869
+   "v": 1790894574
   },
   "ui_paneel_smal": {
    "w": 589,
    "h": 280,
    "bron": "gpt/batch3/ui_knoppen.png",
    "pad": "spel/ui_paneel_smal.png",
-   "v": 1790878869
+   "v": 1790894574
   },
   "ui_plek_1": {
    "w": 309,
    "h": 377,
    "bron": "gpt/batch3/ui_plekken.png",
    "pad": "spel/ui_plek_1.png",
-   "v": 1790878869
+   "v": 1790894574
   },
   "ui_plek_2": {
    "w": 307,
    "h": 375,
    "bron": "gpt/batch3/ui_plekken.png",
    "pad": "spel/ui_plek_2.png",
-   "v": 1790878869
+   "v": 1790894574
   },
   "ui_plek_3": {
    "w": 309,
    "h": 375,
    "bron": "gpt/batch3/ui_plekken.png",
    "pad": "spel/ui_plek_3.png",
-   "v": 1790878869
+   "v": 1790894574
   },
   "ui_plek_4": {
    "w": 312,
    "h": 379,
    "bron": "gpt/batch3/ui_plekken.png",
    "pad": "spel/ui_plek_4.png",
-   "v": 1790878869
+   "v": 1790894574
   },
   "tegel_rand_links": {
    "w": 336,
    "h": 260,
    "bron": "gpt/batch2/bos_tegels.png",
    "pad": "spel/tegel_rand_links.png",
-   "v": 1790878870
+   "v": 1790894575
   },
   "tegel_grond": {
    "w": 303,
    "h": 234,
    "bron": "gpt/batch2/bos_tegels.png",
    "pad": "spel/tegel_grond.png",
-   "v": 1790878870
+   "v": 1790894575
   },
   "tegel_rand_rechts": {
    "w": 349,
    "h": 256,
    "bron": "gpt/batch2/bos_tegels.png",
    "pad": "spel/tegel_rand_rechts.png",
-   "v": 1790878870
+   "v": 1790894575
   },
   "tegel_vulling": {
    "w": 252,
    "h": 209,
    "bron": "gpt/batch2/bos_tegels.png",
    "pad": "spel/tegel_vulling.png",
-   "v": 1790878870
+   "v": 1790894575
   },
   "tegel_helling_op": {
    "w": 347,
    "h": 274,
    "bron": "gpt/batch2/bos_tegels.png",
    "pad": "spel/tegel_helling_op.png",
-   "v": 1790878870
+   "v": 1790894575
   },
   "tegel_helling_af": {
    "w": 352,
    "h": 275,
    "bron": "gpt/batch2/bos_tegels.png",
    "pad": "spel/tegel_helling_af.png",
-   "v": 1790878870
+   "v": 1790894575
   },
   "tegel_muur": {
    "w": 136,
    "h": 295,
    "bron": "gpt/batch2/bos_tegels.png",
    "pad": "spel/tegel_muur.png",
-   "v": 1790878870
+   "v": 1790894575
   },
   "tegel_plafond": {
    "w": 323,
    "h": 180,
    "bron": "gpt/batch2/bos_tegels.png",
    "pad": "spel/tegel_plafond.png",
-   "v": 1790878870
+   "v": 1790894575
   },
   "tegel_platform_links": {
    "w": 313,
    "h": 143,
    "bron": "gpt/batch2/bos_tegels.png",
    "pad": "spel/tegel_platform_links.png",
-   "v": 1790878870
+   "v": 1790894575
   },
   "tegel_platform": {
    "w": 298,
    "h": 119,
    "bron": "gpt/batch2/bos_tegels.png",
    "pad": "spel/tegel_platform.png",
-   "v": 1790878870
+   "v": 1790894575
   },
   "tegel_platform_rechts": {
    "w": 300,
    "h": 142,
    "bron": "gpt/batch2/bos_tegels.png",
    "pad": "spel/tegel_platform_rechts.png",
-   "v": 1790878870
+   "v": 1790894576
   },
   "tegel_haakplafond": {
    "w": 351,
    "h": 209,
    "bron": "gpt/batch2/bos_tegels.png",
    "pad": "spel/tegel_haakplafond.png",
-   "v": 1790878870
+   "v": 1790894576
   }
  },
  "audio": {
