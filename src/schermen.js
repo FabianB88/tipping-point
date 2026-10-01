@@ -45,6 +45,21 @@ TP.achtergrond = function (scene, wereld) {
   scene.add.rectangle(0, 0, W, H, 0x120a04, 0.45).setOrigin(0).setDepth(4);
 };
 
+// Muziek: één spoor tegelijk, loopt door over scenes heen; M dempt alles (onthouden).
+TP.muziek = function (scene, sleutel, volume) {
+  const sm = scene.sound;
+  if (TP.muziekSpoor && TP.muziekSpoor.key === sleutel && TP.muziekSpoor.isPlaying) return;
+  if (TP.muziekSpoor) { TP.muziekSpoor.stop(); TP.muziekSpoor.destroy(); TP.muziekSpoor = null; }
+  if (!scene.cache.audio.exists(sleutel)) return;
+  TP.muziekSpoor = sm.add(sleutel, { loop: true, volume: volume || 0.4 });
+  TP.muziekSpoor.play();
+  sm.mute = TP.lees('tp_mute', false);
+  if (!TP.muteToets) {
+    TP.muteToets = true;
+    scene.input.keyboard.on('keydown-M', () => { sm.mute = !sm.mute; TP.bewaar('tp_mute', sm.mute); });
+  }
+};
+
 TP.bewaar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 TP.lees = (k, std) => { try { const v = localStorage.getItem(k); return v === null ? std : JSON.parse(v); } catch (e) { return std; } };
 
@@ -58,6 +73,8 @@ TP.Boot = class extends Phaser.Scene {
     this.load.image('p_streep', p + 'trace_01.png');
     this.load.image('p_ster', p + 'star_06.png');
     this.load.image('p_cirkel', p + 'circle_05.png');
+    this.load.audio('muziek_menu', 'assets/muziek/menu_carefree.mp3');
+    this.load.audio('muziek_race', 'assets/muziek/race_exhilarate.mp3');
     TP.zetInWachtrij(this);
     const W = TP.W, H = TP.H;
     this.add.rectangle(0, 0, W, H, 0x120a04).setOrigin(0);
@@ -75,6 +92,7 @@ TP.Menu = class extends Phaser.Scene {
   create() {
     const W = TP.W, H = TP.H;
     this.geluid = new TP.Geluid(this);
+    TP.muziek(this, 'muziek_menu', 0.45);
     TP.achtergrond(this, 'bos');
     if (TP.heeft('logo')) {
       const info = TP.manifest.beelden.logo;
@@ -98,7 +116,8 @@ TP.Menu = class extends Phaser.Scene {
       'Shift of S  sliden        C  grijphaak (pakt plafonds en lianen)        X  item        V  schieten        Z  dash        R  opnieuw'
     ];
     this.add.text(W / 2, H - 150, hulp.join('\n'), { ...knopStijl(26), lineSpacing: 12 }).setOrigin(0.5).setDepth(5);
-    this.add.text(W / 2, H - 50, 'Je speelt als vos tegen uil, bever en ijsbeer. Eerste met drie ronden wint.', knopStijl(24, '#d9c9a8')).setOrigin(0.5).setDepth(5);
+    this.add.text(W / 2, H - 50, 'Je speelt als vos tegen uil, bever en ijsbeer. Eerste met drie ronden wint.   M = muziek aan/uit', knopStijl(24, '#d9c9a8')).setOrigin(0.5).setDepth(5);
+    this.add.text(W - 20, H - 12, 'Muziek: Kevin MacLeod (incompetech.com), CC BY 4.0', knopStijl(16, '#b8a888')).setOrigin(1, 1).setDepth(5);
 
     if (TP.heeft('vos_ref')) {
       const info = TP.manifest.beelden.vos_ref;

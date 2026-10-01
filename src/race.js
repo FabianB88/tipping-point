@@ -45,8 +45,8 @@ TP.Race = class extends Phaser.Scene {
     cam.centerOn(this.speler.x + 500, this.speler.y - 300);
     this.frontKant = -1; this.frontAlpha = 1; this.frontKantBeeld = undefined; this.frontX = undefined;
     this.rondeNr = 0; this.spelerUitSinds = 0; this.laatsteStuk = -1;
-    this.geluid.startVuur();
-    this.events.once('shutdown', () => this.geluid.stopVuur());
+    TP.muziek(this, 'muziek_race', 0.35);
+    this.input.keyboard.on('keydown-M', () => { this.sound.mute = !this.sound.mute; TP.bewaar('tp_mute', this.sound.mute); });
   }
 
   // Drie camera's: achtergrond (vast), wereld (zoomt en volgt), interface (vast). Alles wat in de wereld staat
@@ -590,7 +590,7 @@ TP.Race = class extends Phaser.Scene {
     const d = Math.abs(this.speler.x - frontX) * cam.zoom;
     const nabij = Phaser.Math.Clamp(1 - d / 700, 0, 1);
     this.gloed.setAlpha(nabij * 0.35);
-    this.geluid.vuurVolume(0.08 + nabij * 0.4);
+
     this.frontX = frontX;
   }
 

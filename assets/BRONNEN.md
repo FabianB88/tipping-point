@@ -30,3 +30,7 @@ CraftPix heeft de beste gratis packs voor bos-achtergronden, rook, vuur, munten 
 - craftpix.net/freebies/free-game-coins-sprite-sheets/
 
 Licentie CraftPix: gebruik in een spel mag, ook commercieel en zonder naamsvermelding. De losse bestanden mogen niet openbaar doorgegeven worden, dus niet in een openbare GitHub-repo zetten.
+
+## Muziek
+
+`assets/muziek/`: "Exhilarate" (race) en "Carefree" (menu) van Kevin MacLeod, incompetech.com, CC BY 4.0 (naamsvermelding verplicht, staat in het menu). Alternatieven van dezelfde maker in `assets/muziek/alternatieven`.
