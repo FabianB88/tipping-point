@@ -12,6 +12,11 @@ TP.Toetsenbord = class {
       spatie: 'SPACE', shift: 'SHIFT', c: 'C', kk: 'K', x: 'X', j: 'J', v: 'V', l: 'L', z: 'Z', h: 'H'
     });
     this.vorig = {};
+    // toetsen die ingedrukt stonden bij een scenewissel of focusverlies blijven anders "aan" (bijvoorbeeld shift = sliden)
+    scene.input.keyboard.resetKeys();
+    const reset = () => scene.input.keyboard.resetKeys();
+    window.addEventListener('blur', reset);
+    scene.events.once('shutdown', () => window.removeEventListener('blur', reset));
   }
   net(naam, nu) { const r = nu && !this.vorig[naam]; this.vorig[naam] = nu; return r; }
   lees() {
