@@ -292,12 +292,15 @@ TP.Renner = class {
   }
 
   // ---- gebeurtenissen van buiten
-  struikel(bron) {
+  // zwaarte: 'licht' (obstakel: korte rem, je blijft lopen), 'normaal' (vijand), 'zwaar' (raket)
+  struikel(bron, zwaarte) {
     const F = TP.FYS, T = this.t;
     if (T.verdoofd > 0 || T.dash > 0) return false;
     if (this.schild) { this.schild = false; T.verdoofd = 0.15; this.meld('schildBreekt'); return false; }
-    T.verdoofd = F.verdoving; this.vx *= F.klapSnelheid;
-    if (this.opGrond) { this.vy = -320; this.opGrond = false; }
+    const z = zwaarte || 'normaal';
+    T.verdoofd = z === 'licht' ? 0.22 : z === 'zwaar' ? F.verdoving : 0.4;
+    this.vx *= z === 'licht' ? 0.5 : F.klapSnelheid;
+    if (this.opGrond && z !== 'licht') { this.vy = -320; this.opGrond = false; }
     this.haak = null; this.slidet = false;
     this.meld('klap', bron);
     return true;

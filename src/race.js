@@ -475,12 +475,8 @@ TP.Race = class extends Phaser.Scene {
       if (o.type === 'vijand' && r.t.dash > 0) { o.levend = false; this.vernietig(o, true); r.meld('stamp'); o.respawn = this.tijd + 15; continue; }
       if (o.geraaktDoor && o.geraaktDoor[r.id] > this.tijd - 1.0) continue;
       (o.geraaktDoor = o.geraaktDoor || {})[r.id] = this.tijd;
-      if (r.struikel(o.type)) {
-        // harde stop: je knalt ertegenaan en stuitert terug, zoals tegen een kist in SpeedRunners
-        const kant = r.x < o.x ? -1 : 1;
-        r.vx = kant * 260; r.x = kant < 0 ? ol - hb - 2 : orr + hb + 2;
-        if (o.type === 'vijand') o.richting *= -1;
-      }
+      // obstakels remmen je af, ze leggen je niet plat; vijanden en raketten doen meer
+      if (r.struikel(o.type, o.type === 'obstakel' ? 'licht' : 'normaal')) { if (o.type === 'vijand') o.richting *= -1; }
     }
   }
 
@@ -512,7 +508,7 @@ TP.Race = class extends Phaser.Scene {
         if (!p.raket || r === p.van || r.dood) continue;
         if (Math.abs(r.x - p.x) < r.breedte / 2 + 30 && p.y > r.y - r.hoogte - 20 && p.y < r.y + 20) {
           p.leven = 0;
-          if (p.raket) { r.struikel('raket'); this.speelFx('fx_explosie', p.x, p.y + 40, 0.5); this.cameras.main.shake(120, 0.004); if (r.isSpeler) this.toonMelding('Raket van ' + p.van.naam + '!', 1.0, 70); }
+          if (p.raket) { r.struikel('raket', 'zwaar'); this.speelFx('fx_explosie', p.x, p.y + 40, 0.5); this.cameras.main.shake(120, 0.004); if (r.isSpeler) this.toonMelding('Raket van ' + p.van.naam + '!', 1.0, 70); }
           else { r.vx *= 0.75; r.meld('geduwd'); this.speelFx('fx_inslag', p.x, p.y, 0.3); }
         }
       }
