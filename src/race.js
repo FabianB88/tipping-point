@@ -367,7 +367,7 @@ TP.Race = class extends Phaser.Scene {
       this.projectielen.push(p);
     } else if (item === 'peper') { r.boost(2.0); }
     else if (item === 'schild') { r.schild = true; }
-    else if (item === 'sneeuwbal') { const doelen = this.renners.filter(a => a !== r && !a.dood && a.vooruit > r.vooruit && a.vooruit - r.vooruit < 2200); for (const d of doelen) { d.t.bevroren = 1.0; d.meld('bevroren'); this.speelFx('fx_inslag', d.x, d.y - 70, 0.45); } this.cameras.main.flash(250, 160, 220, 255); if (r.isSpeler) this.toonTussentijd(doelen.length ? doelen.length + ' tegenstander(s) bevroren!' : 'Niemand voor je om te bevriezen'); }
+    else if (item === 'sneeuwbal') { const doelen = this.renners.filter(a => a !== r && !a.dood && a.vooruit > r.vooruit && a.vooruit - r.vooruit < 1500); for (const d of doelen) { d.t.bevroren = 0.8; d.meld('bevroren'); this.speelFx('fx_inslag', d.x, d.y - 70, 0.45); if (d.isSpeler) this.toonMelding('Bevroren door ' + r.naam + '!', 1.0, 70); } this.cameras.main.flash(250, 160, 220, 255); if (r.isSpeler) this.toonTussentijd(doelen.length ? doelen.length + ' tegenstander(s) bevroren!' : 'Niemand voor je om te bevriezen'); }
     else if (item === 'magneet') { r.t.magneet = 1.5; }
     else if (item === 'val' || item === 'olie') {
       const o = { type: 'val', t: item, x: r.x - 80 * r.richting, x0: r.x, y: r.y, w: 150, h: 40, levend: true, van: r, armTijd: 0.6 };
@@ -463,7 +463,7 @@ TP.Race = class extends Phaser.Scene {
         if (o.armTijd > 0) { o.armTijd -= dt; continue; }
         if (raakt && !(o.geraakt && o.geraakt[r.id])) {
           (o.geraakt = o.geraakt || {})[r.id] = true;
-          if (o.t === 'val') { r.t.traag = 1.0; r.meld('traag'); } else { r.t.grip = 0.9; r.vx *= 0.5; r.richting *= -1; r.meld('traag'); }
+          if (o.t === 'val') { r.t.traag = 1.0; r.meld('traag'); if (r.isSpeler) this.toonMelding('Honingval van ' + (o.van ? o.van.naam : '?') + '!', 1.0, 70); } else { r.t.grip = 0.9; r.vx *= 0.5; r.richting *= -1; r.meld('traag'); if (r.isSpeler) this.toonMelding('Olie! Je glijdt weg', 1.0, 70); }
           o.levend = false; this.vernietig(o);
         }
         continue;
@@ -512,7 +512,7 @@ TP.Race = class extends Phaser.Scene {
         if (!p.raket || r === p.van || r.dood) continue;
         if (Math.abs(r.x - p.x) < r.breedte / 2 + 30 && p.y > r.y - r.hoogte - 20 && p.y < r.y + 20) {
           p.leven = 0;
-          if (p.raket) { r.struikel('raket'); this.speelFx('fx_explosie', p.x, p.y + 40, 0.5); this.cameras.main.shake(120, 0.004); }
+          if (p.raket) { r.struikel('raket'); this.speelFx('fx_explosie', p.x, p.y + 40, 0.5); this.cameras.main.shake(120, 0.004); if (r.isSpeler) this.toonMelding('Raket van ' + p.van.naam + '!', 1.0, 70); }
           else { r.vx *= 0.75; r.meld('geduwd'); this.speelFx('fx_inslag', p.x, p.y, 0.3); }
         }
       }
@@ -539,9 +539,12 @@ TP.Race = class extends Phaser.Scene {
     const xs = levend.map(r => r.x), ys = levend.map(r => r.y);
     const bx1 = Math.min(...xs), bx2 = Math.max(...xs), by1 = Math.min(...ys), by2 = Math.max(...ys);
     // zoom: de meute in beeld, maar in de loop van de ronde steeds krapper
-    const zoomMin = Phaser.Math.Linear(C.zoomMin, 0.45, Math.min(1, this.rondeTijd / 60));   // ronde eindigt altijd: beeld wordt krapper
+    // ronde eindigt altijd: het beeld wordt krapper, eerst rustig, na 45 s hard; sneller zodra de speler af is
+    const tijd = this.rondeTijd * (this.speler.dood ? 2.5 : 1);
+    const zoomMin = tijd < 45 ? Phaser.Math.Linear(C.zoomMin, 0.45, tijd / 45) : Phaser.Math.Linear(0.45, 0.9, Math.min(1, (tijd - 45) / 40));
+    const zoomMax = Math.max(C.zoomMax, zoomMin);
     const nodig = Math.min(TP.W / (bx2 - bx1 + 1900), TP.H / (by2 - by1 + 1100));
-    this.zoomDoel = Phaser.Math.Clamp(Math.min(C.zoomMax, nodig), zoomMin, C.zoomMax);
+    this.zoomDoel = Phaser.Math.Clamp(Math.min(zoomMax, nodig), zoomMin, zoomMax);
     const z = Phaser.Math.Linear(cam.zoom, this.zoomDoel, 1 - Math.exp(-C.zoomSnelheid * dt));
     cam.setZoom(z);
     // de koploper staat op 62 procent van het beeld in zijn looprichting; de meute weegt licht mee
@@ -700,7 +703,7 @@ TP.Race = class extends Phaser.Scene {
     s.setScale(basis * sx, basis * sy);
     s.setRotation(r.opGrond ? r.hoek * 0.6 : (r.haak ? Phaser.Math.Clamp(r.vx / 2500, -0.5, 0.5) : 0));
     const basisTint = k.tint || 0xffffff;
-    if (r.t.verdoofd > 0) s.setTint(Math.floor(this.tijd * 20) % 2 ? 0xff9977 : basisTint); else if (r.t.bevroren > 0) s.setTint(0x9fd8ff); else if (r.t.boost > 0 || r.t.dash > 0) s.setTint(0xfff0c0); else s.setTint(basisTint);
+    if (r.t.verdoofd > 0) s.setTint(Math.floor(this.tijd * 20) % 2 ? 0xff9977 : basisTint); else if (r.t.bevroren > 0) s.setTint(0x9fd8ff); else if (r.t.traag > 0 || r.t.grip > 0) s.setTint(0xffe27a); else if (r.t.boost > 0 || r.t.dash > 0) s.setTint(0xfff0c0); else s.setTint(basisTint);
     if (k.schaduw) { const g = this.baan.grondOnder(r.x, r.y, 0, 600, false); k.schaduw.setPosition(r.x, g ? g.y : r.y).setVisible(!!g).setScale(1 - Math.min(0.5, (g ? g.y - r.y : 0) / 1000), 1); }
     if (k.naam) k.naam.setPosition(r.x, r.y - r.hoogte - 30);
     if (r.slidet && r.opGrond && this.fx.slideStof && Math.random() < 0.6) this.fx.slideStof.emitParticleAt(r.x - r.richting * 20, r.y, 1);
