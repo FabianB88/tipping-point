@@ -1,0 +1,11 @@
+// Start van het spel. Scenes staan in src/schermen.js en src/race.js.
+window.spel = new Phaser.Game({
+  type: Phaser.AUTO,
+  parent: 'spel',
+  backgroundColor: '#120a04',
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: TP.W, height: TP.H },
+  render: { antialias: true, pixelArt: false, roundPixels: false },
+  fps: { target: 120, min: 30 },
+  scene: [TP.Boot, TP.Menu, TP.Vraag, TP.Race, TP.Ronde, TP.Einde]
+});
+window.addEventListener('resize', () => spel.scale.refresh());

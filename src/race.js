@@ -1,0 +1,741 @@
+// De race: circuit, renners, camera die de koploper volgt, het front aan de rand waar de meute vandaan komt,
+// items, vijanden, HUD. Wie uit beeld raakt, is gepakt.
+window.TP = window.TP || {};
+
+const RENNER_SCHAAL_HOOGTE = 180;   // beeldhoogte van een staand personage in px
+
+TP.Race = class extends Phaser.Scene {
+  constructor() { super('Race'); }
+
+  init(data) {
+    this.opties = data;
+    this.wereld = TP.WERELDEN[data.wereld];
+    this.baanDef = TP.BANEN[data.baan];
+    this.stand = data.stand;              // {namen: [], punten: [], ronde}
+  }
+
+  create() {
+    this.tijd = 0; this.acc = 0; this.fase = 'aftel'; this.aftel = 2.6; this.rondeTijd = 0;
+    this.debug = false;
+    this.geluid = new TP.Geluid(this);
+    this.schaal = {};
+    this.projectielen = [];
+    this.wereldObjecten = []; this.camerasKlaar = false;
+    this.maakAchtergrond();
+    this.laagBaan = this.wereldObject(this.add.layer().setDepth(5));
+    this.laagObjecten = this.wereldObject(this.add.layer().setDepth(6));
+    this.laagRenners = this.wereldObject(this.add.layer().setDepth(8));
+    this.laagFx = this.wereldObject(this.add.layer().setDepth(9));
+    this.baan = new TP.Baan(this, this.baanDef);
+    this.wereldOnder = Math.max(...this.baan.grond.map(s => Math.max(s.y1, s.y2))) + 700;
+    this.tekenBaan();
+    this.maakRenners();
+    this.maakFront();
+    this.maakParticles();
+    this.maakHud();
+    this.debugG = this.wereldObject(this.add.graphics().setDepth(7).setVisible(false));
+    this.touw = this.wereldObject(this.add.graphics().setDepth(8));
+    this.maakCameras();
+    this.input.keyboard.on('keydown-F3', () => { this.debug = !this.debug; this.debugG.setVisible(this.debug); });
+    this.input.keyboard.on('keydown-ESC', () => { this.geluid.stopVuur(); this.scene.start('Menu'); });
+    // R: meteen opnieuw (zelfde ronde, zelfde item), zonder vraag
+    this.input.keyboard.on('keydown-R', () => { this.geluid.stopVuur(); this.scene.restart(this.opties); });
+    const cam = this.cameras.main;
+    cam.setZoom(TP.CAMERA.zoomMin);
+    cam.centerOn(this.speler.x + 500, this.speler.y - 300);
+    this.frontKant = -1; this.frontAlpha = 1; this.frontKantBeeld = undefined; this.frontX = undefined;
+    this.rondeNr = 0; this.spelerUitSinds = 0; this.laatsteStuk = -1;
+    this.geluid.startVuur();
+    this.events.once('shutdown', () => this.geluid.stopVuur());
+  }
+
+  // Drie camera's: achtergrond (vast), wereld (zoomt en volgt), interface (vast). Alles wat in de wereld staat
+  // moet via wereldObject() worden aangemeld, anders tekenen de andere camera's het er dubbel overheen.
+  maakCameras() {
+    const W = TP.W, H = TP.H;
+    this.camWereld = this.cameras.main;
+    this.camAchter = this.cameras.add(0, 0, W, H, false, 'achter');
+    this.camUi = this.cameras.add(0, 0, W, H, false, 'ui');
+    // achtergrond moet als eerste tekenen
+    const lijst = this.cameras.cameras;
+    lijst.splice(lijst.indexOf(this.camAchter), 1); lijst.unshift(this.camAchter);
+    this.camAchter.setBackgroundColor('#120a04');
+    this.camWereld.transparent = true;
+    this.camUi.transparent = true;
+    const achter = this.lagen.map(l => l.ts);
+    const ui = [this.hud, this.front, this.gloed];
+    this.camWereld.ignore(achter.concat(ui));
+    this.camAchter.ignore(ui);
+    this.camUi.ignore(achter);
+    for (const o of this.wereldObjecten) { this.camAchter.ignore(o); this.camUi.ignore(o); }
+    this.camerasKlaar = true;
+  }
+
+  wereldObject(o) {
+    if (!o) return o;
+    this.wereldObjecten.push(o);
+    if (this.camerasKlaar) { this.camAchter.ignore(o); this.camUi.ignore(o); }
+    return o;
+  }
+
+  // ---------------------------------------------------------------- opbouw
+  maakAchtergrond() {
+    const W = TP.W, H = TP.H;
+    this.lagen = [];
+    // Elke laag is precies één kopie hoog (geen verticale herhaling), horizontaal herhaald.
+    const defs = [
+      { k: this.wereld.lagen[0], f: 0.0, d: 0, y: 0, hoog: 1.3, top: -0.15 },
+      { k: this.wereld.lagen[1], f: 0.15, d: 1, y: 0.03, hoog: 1.25, top: -0.1 },
+      { k: this.wereld.lagen[2], f: 0.35, d: 2, y: 0.07, hoog: 1.25, top: -0.08 },
+      { k: this.wereld.lagen[3], f: 0.55, d: 3, y: 0.1, hoog: 1.3, top: -0.1, alpha: 0.55 }
+    ];   // geen voorgrondbladeren in de race: de baan moet leesbaar blijven, zoals in SpeedRunners
+    for (const d of defs) {
+      if (!TP.heeft(d.k)) continue;
+      const info = TP.manifest.beelden[d.k];
+      const schaal = (H * d.hoog) / info.h;
+      const ts = this.add.tileSprite(0, 0, W * 1.3 / schaal, info.h, d.k).setOrigin(0, 0).setScrollFactor(0).setDepth(d.d).setScale(schaal);
+      ts.setPosition(-W * 0.15, H * d.top);
+      if (d.alpha) ts.setAlpha(d.alpha);
+      this.lagen.push({ ts, f: d.f, fy: d.y, schaal, basisY: H * d.top });
+    }
+    this.gloed = this.add.rectangle(0, 0, W, H, this.wereld.gloed, 0).setOrigin(0).setScrollFactor(0).setDepth(13);
+  }
+
+  maakRenners() {
+    this.renners = [];
+    const st = this.baanDef.start;
+    const rollen = ['vos', 'uil', 'bever', 'ijsbeer'];
+    const vaardigheden = [0.9, 0.78, 0.68];
+    this.speler = new TP.Renner(this, { id: 0, rol: 'vos', naam: 'Jij', speler: true, invoer: new TP.Toetsenbord(this), x: st.x, y: st.y, item: this.opties.item || null });
+    this.renners.push(this.speler);
+    for (let i = 0; i < TP.WEDSTRIJD.bots; i++) {
+      const rol = rollen[(i + 1) % rollen.length];
+      const bot = new TP.Bot(this, vaardigheden[i % vaardigheden.length]);
+      this.renners.push(new TP.Renner(this, { id: i + 1, rol, speler: false, invoer: bot, x: st.x - 120 * (i + 1), y: st.y }));
+    }
+    for (const r of this.renners) { r.p = this.baan.voortgang(r.x, r.y, r); r.vooruit = r.p; }
+  }
+
+  maakRennerBeeld(r) {
+    const rol = r.rol;
+    const refKey = TP.heeft(rol + '_ref') ? rol + '_ref' : TP.heeft('vos_ref') ? 'vos_ref' : null;
+    const beeld = { sprite: null, schaduw: null, naam: null, huidig: null, rol: refKey ? (TP.heeft(rol + '_ref') ? rol : 'vos') : null };
+    if (!refKey) return beeld;
+    const info = TP.manifest.beelden[refKey];
+    const schaal = RENNER_SCHAAL_HOOGTE / info.h;
+    this.schaal[rol] = schaal;
+    beeld.schaduw = this.wereldObject(this.add.ellipse(r.x, r.y, 110, 26, 0x000000, 0.28).setDepth(7));
+    beeld.sprite = this.add.sprite(r.x, r.y, refKey).setOrigin(0.5, 1).setScale(schaal);
+    this.laagRenners.add(beeld.sprite);
+    const p = beeld.rol;
+    if (TP.heeft(p + '_ren') && !this.anims.exists(p + '_ren')) {
+      this.anims.create({ key: p + '_ren', frames: this.anims.generateFrameNumbers(p + '_ren'), frameRate: 14, repeat: -1 });
+    }
+    if (!TP.heeft(rol + '_ref') && rol !== 'vos') beeld.tint = TP.ROLLEN[rol].tint;
+    beeld.naam = this.wereldObject(this.add.text(r.x, r.y - 175, r.isSpeler ? '' : r.naam, { fontFamily: TP.FONT, fontSize: '26px', color: '#fff4dc', stroke: '#2a1a0c', strokeThickness: 5 }).setOrigin(0.5).setDepth(10));
+    return beeld;
+  }
+
+  maakFront() {
+    // Geen vlammenzee: de schermrand is de dood. Wel een hittegloed met vonken zodat je voelt waar de rand is.
+    const H = TP.H;
+    this.front = this.add.container(0, 0).setDepth(11).setScrollFactor(0);
+    const g = this.add.graphics();
+    const breedte = 90;
+    for (let i = 0; i < 24; i++) {
+      const t = i / 24;
+      g.fillStyle(this.wereld.frontKleur, 0.45 * (1 - t) * (1 - t));
+      g.fillRect(-breedte + i * (breedte / 24), 0, breedte / 24 + 1, H);
+    }
+    this.frontGloed = g;
+    this.front.add(g);
+    this.frontBeeld = null;
+  }
+
+  maakParticles() {
+    const heeft = k => this.textures.exists(k);
+    this.fx = {};
+    if (heeft('p_rook')) {
+      this.fx.stof = this.add.particles(0, 0, 'p_rook', { lifespan: 500, speed: { min: 20, max: 120 }, angle: { min: 200, max: 340 }, scale: { start: 0.25, end: 0.6 }, alpha: { start: 0.5, end: 0 }, tint: 0xd8c3a0, emitting: false }).setDepth(7);
+      this.fx.slideStof = this.add.particles(0, 0, 'p_rook', { lifespan: 400, speed: { min: 40, max: 90 }, angle: { min: 160, max: 200 }, scale: { start: 0.15, end: 0.45 }, alpha: { start: 0.45, end: 0 }, tint: 0xd8c3a0, emitting: false }).setDepth(7);
+      this.fx.rook = this.add.particles(0, 0, 'p_rook', { lifespan: 1600, speedX: { min: 60, max: 220 }, speedY: { min: -260, max: -80 }, scale: { start: 0.9, end: 2.2 }, alpha: { start: 0.5, end: 0 }, tint: [0x2a1a14, 0x4a2a1a], emitting: false }).setDepth(10);
+    }
+    if (heeft('p_vonk')) {
+      this.fx.vonken = this.add.particles(0, 0, 'p_vonk', { lifespan: { min: 500, max: 1100 }, speedX: { min: 120, max: 520 }, speedY: { min: -420, max: -60 }, gravityY: 260, scale: { start: 0.35, end: 0 }, tint: this.wereld.vonken, blendMode: 'ADD', emitting: false }).setDepth(10);
+      this.fx.inslag = this.add.particles(0, 0, 'p_vonk', { lifespan: 350, speed: { min: 150, max: 420 }, scale: { start: 0.4, end: 0 }, tint: [0xfff1b0, 0xffb347], blendMode: 'ADD', emitting: false }).setDepth(9);
+      this.fx.boost = this.add.particles(0, 0, 'p_vonk', { lifespan: 300, speedX: { min: -500, max: -200 }, speedY: { min: -40, max: 40 }, scale: { start: 0.3, end: 0 }, tint: [0xfff1b0, 0x9bff6a], blendMode: 'ADD', emitting: false }).setDepth(7);
+    }
+    if (heeft('p_streep')) {
+      this.fx.strepen = this.add.particles(0, 0, 'p_streep', { lifespan: 220, speedX: { min: -900, max: -600 }, scale: { start: 0.6, end: 0.1 }, alpha: { start: 0.5, end: 0 }, emitting: false }).setDepth(7);
+    }
+    for (const e of Object.values(this.fx)) this.wereldObject(e);
+    for (const k of ['fx_vuur', 'fx_stof', 'fx_inslag', 'fx_explosie', 'fx_boost']) {
+      if (TP.heeft(k) && !this.anims.exists(k)) this.anims.create({ key: k, frames: this.anims.generateFrameNumbers(k), frameRate: k === 'fx_vuur' ? 14 : 18, repeat: k === 'fx_vuur' ? -1 : 0 });
+    }
+  }
+
+  speelFx(naam, x, y, schaal) {
+    if (!TP.heeft(naam)) return;
+    const s = this.add.sprite(x, y, naam).setOrigin(0.5, 0.8).setScale(schaal || 0.3).setDepth(9);
+    this.laagFx.add(s);
+    s.play(naam);
+    s.once('animationcomplete', () => s.destroy());
+  }
+
+  maakHud() {
+    const W = TP.W, H = TP.H;
+    const stijl = (gr, kleur) => ({ fontFamily: TP.FONT, fontSize: gr + 'px', color: kleur || '#fff4dc', stroke: '#2a1a0c', strokeThickness: Math.round(gr / 6) });
+    this.hud = this.add.container(0, 0).setDepth(20).setScrollFactor(0);
+    const voeg = o => { this.hud.add(o); return o; };
+    const paneel = (x, y, b, h, smal) => {
+      const k = smal && TP.heeft('ui_paneel_smal') ? 'ui_paneel_smal' : TP.heeft('ui_paneel') ? 'ui_paneel' : null;
+      if (!k) return voeg(this.add.rectangle(x, y, b, h, 0x1d1208, 0.7).setStrokeStyle(3, 0x8a5a2a));
+      const i = TP.manifest.beelden[k]; const r = Math.max(i.w / b, i.h / h, 0.6);
+      const n = voeg(this.add.nineslice(x, y, k, 0, b * r, h * r, 170, 170, 90, 90).setScale(1 / r));
+      voeg(this.add.rectangle(x, y, b - 50, h - 44, 0x1d1208, 0.55));
+      return n;
+    };
+    const slot = (x, y, d) => {
+      if (TP.heeft('ui_rond')) { const i = TP.manifest.beelden.ui_rond; return voeg(this.add.image(x, y, 'ui_rond').setScale(d / i.h)); }
+      return voeg(this.add.circle(x, y, d / 2, 0x5a3a1c, 0.9).setStrokeStyle(3, 0xf4d9a8));
+    };
+
+    // onderbalk: item, dash, plek, tijd
+    paneel(W / 2, H - 78, 1180, 150, true);
+    slot(W / 2 - 440, H - 80, 118);
+    this.hudItemBeeld = voeg(this.add.image(W / 2 - 440, H - 84, 'vos_ref').setVisible(false));
+    this.hudItemTekst = voeg(this.add.text(W / 2 - 340, H - 100, '', stijl(26, '#ffd23f')).setOrigin(0, 0.5));
+    this.hudItemHint = voeg(this.add.text(W / 2 - 340, H - 66, 'X  item', stijl(20, '#d9c9a8')).setOrigin(0, 0.5));
+    slot(W / 2 - 120, H - 80, 118);
+    this.hudDashSchaduw = voeg(this.add.graphics());
+    this.hudDashTekst = voeg(this.add.text(W / 2 - 120, H - 84, 'DASH', stijl(22)).setOrigin(0.5));
+    voeg(this.add.text(W / 2 - 20, H - 100, 'Dash', stijl(26, '#ffd23f')).setOrigin(0, 0.5));
+    this.hudDashSub = voeg(this.add.text(W / 2 - 20, H - 66, 'Z  klaar', stijl(20, '#d9c9a8')).setOrigin(0, 0.5));
+    this.hudPlek = voeg(this.add.text(W / 2 + 230, H - 84, '1e', stijl(64)).setOrigin(0.5));
+    this.hudPlekSub = voeg(this.add.text(W / 2 + 230, H - 36, '', stijl(20, '#d9c9a8')).setOrigin(0.5));
+    this.hudTijd = voeg(this.add.text(W / 2 + 470, H - 92, '0.00', stijl(44)).setOrigin(0.5));
+    this.hudRondje = voeg(this.add.text(W / 2 + 470, H - 44, '', stijl(20, '#d9c9a8')).setOrigin(0.5));
+
+    // linksboven: stand van de wedstrijd
+    paneel(300, 70, 560, 100, true);
+    this.hudStand = voeg(this.add.text(300, 70, '', { ...stijl(24), align: 'center' }).setOrigin(0.5));
+    // rechtsboven: snelheid
+    this.hudSnelheid = voeg(this.add.text(W - 40, 30, '', stijl(26)).setOrigin(1, 0));
+    this.hudRonde = voeg(this.add.text(W / 2, 30, '', stijl(24, '#ffd23f')).setOrigin(0.5, 0));
+
+    this.hudMelding = voeg(this.add.text(W / 2, H * 0.36, '', { fontFamily: TP.FONT_TITEL, fontSize: '110px', color: '#fff4dc', stroke: '#2a1a0c', strokeThickness: 14 }).setOrigin(0.5).setAlpha(0));
+    this.hudTussen = voeg(this.add.text(W / 2, H * 0.5, '', stijl(34, '#9bff6a')).setOrigin(0.5).setAlpha(0));
+
+    // tips voor de eerste races
+    this.tipsGezien = TP.lees('tp_tips', 0);
+    if (this.tipsGezien < 3) {
+      this.tipPaneel = paneel(W / 2, 150, 760, 90, true);
+      this.tipTekst = voeg(this.add.text(W / 2, 150, '', stijl(28)).setOrigin(0.5));
+      this.tips = ['Pijltjes of A/D rennen, spatie springen, 2x spatie = dubbele sprong', 'Houd C vast bij een plafond of liaan: grijphaak. Loslaten geeft vaart.', 'Shift: slide onder lage takken. Bergaf is sliden het snelst.', 'Spring tegen een muur en spring opnieuw: wall-jump.', 'Wie opzij uit beeld raakt, is gepakt. Blijf bij de koploper.', 'Z: dash. X: item uit een krat gebruiken.'];
+      this.tipIndex = -1; this.tipTimer = 0;
+      TP.bewaar('tp_tips', this.tipsGezien + 1);
+    }
+    this.toonMelding('Klaar...', 1.0);
+    this.hudRonde.setText('Ronde ' + this.stand.ronde + '  ·  eerste met ' + TP.WEDSTRIJD.rondesNodig + ' wint');
+  }
+
+  toonMelding(tekst, duur, grootte) {
+    this.hudMelding.setText(tekst).setAlpha(1).setScale(1.25).setFontSize(grootte || 110);
+    this.hudTussen.setAlpha(0);
+    this.tweens.killTweensOf(this.hudMelding);
+    this.tweens.add({ targets: this.hudMelding, scale: 1, duration: 180, ease: 'Back.Out' });
+    this.tweens.add({ targets: this.hudMelding, alpha: 0, delay: duur * 1000, duration: 300 });
+  }
+
+  toonTussentijd(tekst) {
+    this.hudTussen.setText(tekst).setAlpha(1);
+    this.tweens.killTweensOf(this.hudTussen);
+    this.tweens.add({ targets: this.hudTussen, alpha: 0, delay: 1400, duration: 400 });
+  }
+
+  // ---------------------------------------------------------------- het circuit in beeld
+  tekenBaan() {
+    for (const s of this.baan.grond) { if (!s.blokTop) this.tekenGrond(s); }
+    for (const b of this.baan.blokken) this.tekenBlok(b);
+    for (const a of this.baan.ankers) {
+      if (TP.heeft('bos_obstakel_5')) {
+        const info = TP.manifest.beelden['bos_obstakel_5'];
+        a.sprite = this.add.image(a.x, a.y - 30, 'bos_obstakel_5').setOrigin(0.5, 0.08).setScale(150 / info.h);
+        this.laagObjecten.add(a.sprite);
+        this.tweens.add({ targets: a.sprite, angle: { from: -4, to: 4 }, duration: 1600 + Math.random() * 600, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+      }
+    }
+    for (const o of this.baan.objecten) this.maakObjectBeeld(o);
+  }
+
+  tekenGrond(s) {
+    const lengte = Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
+    const k = s.oneWay ? 'tegel_platform' : 'tegel_grond';
+    if (!TP.heeft(k)) return;
+    const info = TP.manifest.beelden[k];
+    const hoog = s.oneWay ? 70 : 120;
+    const schaal = hoog / info.h;
+    const ts = this.add.tileSprite(s.x1, s.y1, lengte / schaal, info.h, k).setOrigin(0, 0.18).setScale(schaal).setRotation(s.hoek);
+    this.laagBaan.add(ts);
+    s.sprite = ts;
+    if (s.oneWay) {
+      // uiteinden van een zwevend platform
+      for (const [kant, x, flip] of [['tegel_platform_links', s.x1, false], ['tegel_platform_rechts', s.x2, true]]) {
+        if (!TP.heeft(kant)) continue;
+        const ki = TP.manifest.beelden[kant];
+        const ks = (hoog * 1.15) / ki.h;
+        const e = this.add.image(x, s.y1 - hoog * 0.18, kant).setOrigin(flip ? 0.15 : 0.85, 0.1).setScale(ks);
+        this.laagBaan.add(e);
+      }
+      return;
+    }
+    if (TP.heeft('tegel_vulling')) {
+      const vi = TP.manifest.beelden['tegel_vulling'];
+      const vs = 256 / vi.h;
+      const stap = 128;
+      // onderste niveau krijgt diepe grond; hogere niveaus zijn een dikke plaat zodat je eronderdoor kunt kijken
+      const laagste = Math.max(s.y1, s.y2) > this.wereldOnder - 900;
+      const bodem = Math.min(this.wereldOnder - 300, Math.max(s.y1, s.y2) + (laagste ? 380 : 200));
+      for (let x = s.x1; x < s.x2; x += stap) {
+        const b = Math.min(stap, s.x2 - x);
+        const y = TP.Baan.hoogteOp(s, Math.min(x + b / 2, s.x2)) + hoog * 0.6;
+        const kolom = this.add.tileSprite(x, y, b / vs, Math.max(1, (bodem - y) / vs), 'tegel_vulling').setOrigin(0, 0).setScale(vs);
+        kolom.tilePositionX = x / vs; kolom.tilePositionY = y / vs;
+        kolom.setTint(0x8a7a66);   // vulling donkerder dan de loopstrook, zodat platforms en randen opvallen
+        this.laagBaan.add(kolom);
+      }
+    }
+  }
+
+  tekenBlok(b) {
+    if (!TP.heeft('tegel_vulling')) return;
+    const vi = TP.manifest.beelden['tegel_vulling'];
+    const vs = 256 / vi.h;
+    b.sprite = this.add.tileSprite(b.x, b.y, b.w / vs, b.h / vs, 'tegel_vulling').setOrigin(0).setScale(vs);
+    b.sprite.tilePositionX = b.x / vs; b.sprite.tilePositionY = b.y / vs; b.sprite.setTint(0x9a8a74);
+    this.laagBaan.add(b.sprite);
+    if (TP.heeft('tegel_muur')) {
+      const mi = TP.manifest.beelden['tegel_muur'];
+      const ms = 110 / mi.w;
+      const l = this.add.tileSprite(b.x, b.y, mi.w, b.h / ms, 'tegel_muur').setOrigin(0, 0).setScale(ms);
+      const r = this.add.tileSprite(b.x + b.w, b.y, mi.w, b.h / ms, 'tegel_muur').setOrigin(1, 0).setScale(ms).setFlipX(true);
+      this.laagBaan.add(l); this.laagBaan.add(r);
+    }
+    if (TP.heeft('tegel_plafond') && b.h > 200) {
+      const pi = TP.manifest.beelden['tegel_plafond'];
+      const ps = 90 / pi.h;
+      const p = this.add.tileSprite(b.x, b.y + b.h, b.w / ps, pi.h, 'tegel_plafond').setOrigin(0, 0.75).setScale(ps);
+      this.laagBaan.add(p);
+    }
+    if (TP.heeft('tegel_grond')) {
+      const gi = TP.manifest.beelden['tegel_grond'];
+      const gs = 120 / gi.h;
+      const top = this.add.tileSprite(b.x, b.y, b.w / gs, gi.h, 'tegel_grond').setOrigin(0, 0.18).setScale(gs);
+      this.laagBaan.add(top);
+    }
+  }
+
+  maakObjectBeeld(o) {
+    let k = null, hoogte = 110;
+    if (o.type === 'boost') { k = TP.heeft('bos_boostplaat') ? 'bos_boostplaat' : null; hoogte = 60; }
+    else if (o.type === 'krat') { k = TP.heeft('item_krat') ? 'item_krat' : TP.heeft('bos_krat') ? 'bos_krat' : null; hoogte = 90; }
+    else if (o.type === 'obstakel' || o.type === 'decor') { k = TP.heeft(o.t) ? o.t : null; hoogte = o.h || 140; if (o.type === 'decor') hoogte = o.hoogte || 180; }
+    else if (o.type === 'vijand') { k = TP.heeft(o.t) ? o.t : null; hoogte = o.h || 120; }
+    else if (o.type === 'val') { k = TP.heeft('item_' + o.t) ? 'item_' + o.t : null; hoogte = 50; }
+    if (!k) return;
+    const info = TP.manifest.beelden[k];
+    const s = hoogte / info.h;
+    const spr = this.add.image(o.x, o.y, k).setOrigin(0.5, 1).setScale(s);
+    if (o.type === 'obstakel' || o.type === 'vijand') { o.w = Math.max(o.w, spr.displayWidth * 0.8); o.h = Math.max(o.h, spr.displayHeight * 0.9); }
+    if (o.type === 'decor') { this.wereldObject(spr); spr.setDepth(o.laag < 0 ? 4 : 10).setAlpha(o.laag < 0 ? 0.9 : 1); if (o.laag < 0) spr.setScale(s * 0.9).setTint(0xbbaa99); }
+    else this.laagObjecten.add(spr);
+    if (o.type === 'boost') { spr.setOrigin(0.5, 0.85).setFlipX(o.richting < 0); this.tweens.add({ targets: spr, alpha: { from: 1, to: 0.65 }, duration: 350, yoyo: true, repeat: -1 }); }
+    if (o.type === 'krat') this.tweens.add({ targets: spr, y: o.y - 14, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    o.sprite = spr;
+    o.schaal = s;
+  }
+
+  // ---------------------------------------------------------------- spel-acties
+  gebruikItem(r) {
+    const item = r.item; r.item = null;
+    if (r.isSpeler) this.toonTussentijd(TP.ITEMS[item].naam + '!');
+    const doel = this.renners.filter(a => a !== r && !a.dood && a.vooruit > r.vooruit).sort((a, b) => a.vooruit - b.vooruit)[0];
+    this.geluid.speel('item');
+    if (item === 'raket') {
+      const p = { x: r.x + 40 * r.richting, y: r.y - 80, vx: r.richting * (Math.max(Math.abs(r.vx), 600) + 900), van: r, leven: 2.6, raket: true, doel: doel || null };
+      p.sprite = this.maakProjectielBeeld(p);
+      this.projectielen.push(p);
+    } else if (item === 'peper') { r.boost(2.0); }
+    else if (item === 'schild') { r.schild = true; }
+    else if (item === 'sneeuwbal') { const doelen = this.renners.filter(a => a !== r && !a.dood && a.vooruit > r.vooruit && a.vooruit - r.vooruit < 2200); for (const d of doelen) { d.t.bevroren = 1.0; d.meld('bevroren'); this.speelFx('fx_inslag', d.x, d.y - 70, 0.45); } this.cameras.main.flash(250, 160, 220, 255); if (r.isSpeler) this.toonTussentijd(doelen.length ? doelen.length + ' tegenstander(s) bevroren!' : 'Niemand voor je om te bevriezen'); }
+    else if (item === 'magneet') { r.t.magneet = 1.5; }
+    else if (item === 'val' || item === 'olie') {
+      const o = { type: 'val', t: item, x: r.x - 80 * r.richting, x0: r.x, y: r.y, w: 150, h: 40, levend: true, van: r, armTijd: 0.6 };
+      this.baan.objecten.push(o); this.maakObjectBeeld(o);
+    }
+  }
+
+  maakProjectielBeeld(p) {
+    const k = p.raket ? 'item_raket' : 'item_eikel';
+    if (TP.heeft(k)) return this.wereldObject(this.add.image(p.x, p.y, k).setScale((p.raket ? 80 : 36) / TP.manifest.beelden[k].h).setDepth(9));
+    // eigen tekening: gloeiende eikel
+    return this.wereldObject(this.add.circle(p.x, p.y, p.raket ? 22 : 12, p.raket ? 0xff9a3c : 0xffd23f).setStrokeStyle(4, 0x3a2412).setDepth(9));
+  }
+
+  schiet(r) {
+    if (r.t.schot > 0) return;
+    r.t.schot = 0.5;
+    const p = { x: r.x + 30 * r.richting, y: r.y - r.hoogte * 0.6, vx: r.richting * (Math.abs(r.vx) + 1300), van: r, leven: 0.7, raket: false };
+    p.sprite = this.maakProjectielBeeld(p);
+    this.projectielen.push(p);
+    r.meld('schiet');
+  }
+
+  valtUitBeeld(r) {
+    r.x = r.laatsteGrondX !== undefined ? r.laatsteGrondX : r.x; r.y = r.laatsteGrondY !== undefined ? r.laatsteGrondY - 2 : r.y;
+    r.vy = 0; r.vx = 0; r.opGrond = false; r.haak = null;
+    r.t.verdoofd = 0.7; r.meld('klap');
+  }
+
+  // ---------------------------------------------------------------- hoofdlus
+  update(_, dms) {
+    const dt = Math.min(dms / 1000, 0.05);
+    if (this.fase === 'aftel') {
+      const v = this.aftel; this.aftel -= dt;
+      if (v > 1.9 && this.aftel <= 1.9) { this.toonMelding('3', 0.5, 140); this.geluid.speel('tel'); }
+      if (v > 1.3 && this.aftel <= 1.3) { this.toonMelding('2', 0.5, 140); this.geluid.speel('tel'); }
+      if (v > 0.7 && this.aftel <= 0.7) { this.toonMelding('1', 0.5, 140); this.geluid.speel('tel'); }
+      if (this.aftel <= 0) { this.fase = 'race'; this.toonMelding('REN!', 0.7, 150); this.geluid.speel('start'); }
+      this.volgCamera(dt, true);
+      this.tekenAlles(dt);
+      return;
+    }
+    if (this.fase === 'race' || this.fase === 'uitloop') {
+      this.rondeTijd += dt;
+      this.acc += dt;
+      let n = 0;
+      while (this.acc >= TP.STAP && n < 8) { this.fysicaStap(TP.STAP); this.acc -= TP.STAP; n++; }
+      this.volgCamera(dt, false);
+      this.controleerFront(dt);
+    }
+    this.tekenAlles(dt);
+  }
+
+  fysicaStap(dt) {
+    const koploper = this.koploper();
+    for (const r of this.renners) {
+      if (r.dood) continue;
+      // rubberband: bots achter de koploper lopen harder, bots ver vóór de speler iets zachter (de race blijft spannend)
+      if (!r.isSpeler) { const d = koploper.vooruit - r.vooruit; const voorOpSpeler = r.vooruit - this.speler.vooruit; r.rubber = d > 1600 ? 1.14 : d > 900 ? 1.08 : d > 400 ? 1.03 : (voorOpSpeler > 1400 ? 0.9 : voorOpSpeler > 700 ? 0.95 : 1); }
+      r.stap(dt);
+      this.botsObjecten(r, dt);
+      if (r.t.magneet > 0) {
+        const a = this.baan.ankerVoor(r.x, r.handY(), r.richting, 900);
+        if (a) { r.vx += Math.sign(a.x - r.x) * 2400 * dt; r.vy += Math.sign(a.y - r.y) * 1800 * dt; if (r.opGrond && a.y < r.y - 100) { r.opGrond = false; r.vy = -600; } }
+      }
+    }
+    this.stapVijanden(dt);
+    this.stapProjectielen(dt);
+    this.tijd += dt;
+  }
+
+  koploper() {
+    let k = null;
+    for (const r of this.renners) if (!r.dood && (!k || r.vooruit > k.vooruit)) k = r;
+    return k || this.speler;
+  }
+
+  botsObjecten(r, dt) {
+    const hb = r.breedte / 2, h = r.hoogte;
+    for (const o of this.baan.objecten) {
+      if (!o.levend || o.type === 'decor') continue;
+      const ol = o.x - o.w / 2, orr = o.x + o.w / 2, ot = o.y - o.h, ob = o.y;
+      const raakt = r.x + hb > ol && r.x - hb < orr && r.y > ot && r.y - h < ob;
+      if (o.type === 'boost') {
+        if (raakt && !(o.laatst && o.laatst[r.id] > this.tijd - 1)) { (o.laatst = o.laatst || {})[r.id] = this.tijd; r.vx = o.richting * Math.max(Math.abs(r.vx), TP.FYS.boostplaat); r.richting = o.richting; r.boost(TP.FYS.boostplaatTijd); r.meld('boostplaat'); }
+        continue;
+      }
+      if (o.type === 'krat') {
+        if (raakt) { o.levend = false; this.vernietig(o); const nieuw = !r.item; r.item = r.item || Phaser.Utils.Array.GetRandom(Object.keys(TP.ITEMS)); r.meld('krat'); this.speelFx('fx_inslag', o.x, o.y - 40, 0.3); o.respawn = this.tijd + 12; if (r.isSpeler && nieuw) { this.toonTussentijd(TP.ITEMS[r.item].naam + ': ' + TP.ITEMS[r.item].uitleg + '  Druk op X'); this.itemPop = 0.5; } }
+        continue;
+      }
+      if (o.type === 'val') {
+        if (o.armTijd > 0) { o.armTijd -= dt; continue; }
+        if (raakt && !(o.geraakt && o.geraakt[r.id])) {
+          (o.geraakt = o.geraakt || {})[r.id] = true;
+          if (o.t === 'val') { r.t.traag = 1.0; r.meld('traag'); } else { r.t.grip = 0.9; r.vx *= 0.5; r.richting *= -1; r.meld('traag'); }
+          o.levend = false; this.vernietig(o);
+        }
+        continue;
+      }
+      const rakelings = !raakt && r.x + hb + TP.FYS.rakelingsAfstand > ol && r.x - hb - TP.FYS.rakelingsAfstand < orr && r.y > ot - TP.FYS.rakelingsAfstand && r.y - h < ob + TP.FYS.rakelingsAfstand;
+      if (rakelings && !(o.rakelings && o.rakelings[r.id]) && Math.abs(r.vx) > 400) { (o.rakelings = o.rakelings || {})[r.id] = true; r.t.rakelings = TP.FYS.rakelingsTijd; r.meld('rakelings'); }
+      if (!raakt) continue;
+      if (o.type === 'vijand' && r.vy > 0 && r.y < ot + 50) { o.levend = false; this.vernietig(o, true); r.hupje(); this.speelFx('fx_inslag', o.x, ot, 0.4); o.respawn = this.tijd + 15; continue; }
+      if (o.type === 'vijand' && r.t.dash > 0) { o.levend = false; this.vernietig(o, true); r.meld('stamp'); o.respawn = this.tijd + 15; continue; }
+      if (o.geraaktDoor && o.geraaktDoor[r.id] > this.tijd - 1.0) continue;
+      (o.geraaktDoor = o.geraaktDoor || {})[r.id] = this.tijd;
+      if (r.struikel(o.type)) {
+        // harde stop: je knalt ertegenaan en stuitert terug, zoals tegen een kist in SpeedRunners
+        const kant = r.x < o.x ? -1 : 1;
+        r.vx = kant * 260; r.x = kant < 0 ? ol - hb - 2 : orr + hb + 2;
+        if (o.type === 'vijand') o.richting *= -1;
+      }
+    }
+  }
+
+  vernietig(o) {
+    if (!o.sprite) return;
+    const s = o.sprite; o.sprite = null;
+    this.tweens.add({ targets: s, alpha: 0, scaleY: s.scaleY * 0.2, y: s.y + 20, duration: 220, onComplete: () => s.destroy() });
+  }
+
+  stapVijanden(dt) {
+    for (const o of this.baan.objecten) {
+      // kratten en vijanden komen terug (het circuit wordt meerdere keren gereden)
+      if (!o.levend && o.respawn && this.tijd > o.respawn) { o.levend = true; o.respawn = 0; o.x = o.x0; this.maakObjectBeeld(o); if (o.sprite) { o.sprite.setAlpha(0); this.tweens.add({ targets: o.sprite, alpha: 1, duration: 400 }); } }
+      if (!o.levend || o.type !== 'vijand') continue;
+      o.x += o.richting * o.snelheid * dt;
+      if (Math.abs(o.x - o.x0) > o.bereik) { o.richting = -Math.sign(o.x - o.x0); o.x = o.x0 + Math.sign(o.x - o.x0) * o.bereik * 0.999; }
+      if (o.sprite) { o.sprite.setX(o.x).setFlipX(o.richting > 0); if (o.zweeft) o.sprite.setY(o.y + Math.sin(this.tijd * 3 + o.x0) * 18); }
+    }
+  }
+
+  stapProjectielen(dt) {
+    for (const p of this.projectielen) {
+      p.x += p.vx * dt; p.leven -= dt;
+      if (p.raket && p.doel && !p.doel.dood) { p.y += Phaser.Math.Clamp((p.doel.y - 80) - p.y, -900 * dt, 900 * dt); if (Math.sign(p.doel.x - p.x) !== Math.sign(p.vx)) p.vx *= -1; }   // raket zoekt zijn doel
+      if (p.sprite) { p.sprite.setPosition(p.x, p.y); if (p.sprite.setFlipX) p.sprite.setFlipX(p.vx < 0); p.sprite.setAngle(p.raket ? Math.sin(this.tijd * 20) * 4 : p.sprite.angle + 600 * dt); }
+      if (p.raket && this.fx.vonken && Math.random() < 0.5) this.fx.vonken.emitParticleAt(p.x - 30 * Math.sign(p.vx), p.y, 1);
+      // een gewoon schot raakt alleen vijanden; alleen de eikelraket (item) raakt tegenstanders
+      for (const r of this.renners) {
+        if (!p.raket || r === p.van || r.dood) continue;
+        if (Math.abs(r.x - p.x) < r.breedte / 2 + 30 && p.y > r.y - r.hoogte - 20 && p.y < r.y + 20) {
+          p.leven = 0;
+          if (p.raket) { r.struikel('raket'); this.speelFx('fx_explosie', p.x, p.y + 40, 0.5); this.cameras.main.shake(120, 0.004); }
+          else { r.vx *= 0.75; r.meld('geduwd'); this.speelFx('fx_inslag', p.x, p.y, 0.3); }
+        }
+      }
+      for (const o of this.baan.objecten) {
+        if (!o.levend || o.type !== 'vijand') continue;
+        if (Math.abs(o.x - p.x) < o.w / 2 + 20 && p.y > o.y - o.h - 10 && p.y < o.y + 10) { p.leven = 0; o.levend = false; this.vernietig(o, true); o.respawn = this.tijd + 15; this.speelFx('fx_inslag', o.x, o.y - o.h / 2, 0.4); }
+      }
+      if (p.leven <= 0 && p.sprite) { p.sprite.destroy(); p.sprite = null; }
+    }
+    this.projectielen = this.projectielen.filter(p => p.leven > 0);
+  }
+
+  // ---------------------------------------------------------------- camera en front
+  beeldRand() {
+    const cam = this.cameras.main;
+    const bw = TP.W / cam.zoom, bh = TP.H / cam.zoom;
+    return { links: cam.midPoint.x - bw / 2, rechts: cam.midPoint.x + bw / 2, boven: cam.midPoint.y - bh / 2, onder: cam.midPoint.y + bh / 2 };
+  }
+
+  volgCamera(dt, start) {
+    const cam = this.cameras.main, C = TP.CAMERA;
+    const k = this.koploper();
+    const levend = this.renners.filter(r => !r.dood);
+    const xs = levend.map(r => r.x), ys = levend.map(r => r.y);
+    const bx1 = Math.min(...xs), bx2 = Math.max(...xs), by1 = Math.min(...ys), by2 = Math.max(...ys);
+    // zoom: de meute in beeld, maar in de loop van de ronde steeds krapper
+    const zoomMin = Phaser.Math.Linear(C.zoomMin, 0.45, Math.min(1, this.rondeTijd / 60));   // ronde eindigt altijd: beeld wordt krapper
+    const nodig = Math.min(TP.W / (bx2 - bx1 + 1900), TP.H / (by2 - by1 + 1100));
+    this.zoomDoel = Phaser.Math.Clamp(Math.min(C.zoomMax, nodig), zoomMin, C.zoomMax);
+    const z = Phaser.Math.Linear(cam.zoom, this.zoomDoel, 1 - Math.exp(-C.zoomSnelheid * dt));
+    cam.setZoom(z);
+    // de koploper staat op 62 procent van het beeld in zijn looprichting; de meute weegt licht mee
+    const d = this.baan.richtingOp(k.x, k.y, k);
+    const been = k.been || this.baan.beenOp(k.x, k.y);
+    const verticaal = been && (been.type === 'klim' || been.type === 'daal');
+    const doelX = verticaal ? (k.x * 0.6 + (bx1 + bx2) / 2 * 0.4) : k.x - d * (TP.W / z) * 0.08;
+    // verticaal: tussen de hoogste en laagste renner in, met een lichte voorkeur voor de koploper
+    const doelY = (by1 + by2) / 2 * 0.55 + k.y * 0.45 - 120;
+    const cx = Phaser.Math.Linear(cam.midPoint.x, doelX, start ? 1 : 1 - Math.exp(-C.volgX * dt));
+    const cy = Phaser.Math.Linear(cam.midPoint.y, doelY, start ? 1 : 1 - Math.exp(-C.volgY * dt));
+    cam.centerOn(cx, cy);
+    // front aan de kant waar de koploper vandaan komt
+    if (!verticaal) this.frontKant = d > 0 ? -1 : 1;
+  }
+
+  controleerFront(dt) {
+    const cam = this.cameras.main;
+    const rand = this.beeldRand();
+    const m = TP.CAMERA.frontMarge / cam.zoom;
+    for (const r of this.renners) {
+      if (r.dood) continue;
+      const hb = r.breedte / 2;
+      // opzij uit beeld = gepakt door het front; boven of onder uit beeld krijgt wat extra ruimte (hoge en lage routes)
+      if (r.x + hb < rand.links + m || r.x - hb > rand.rechts - m || r.y - r.hoogte > rand.onder + 60 || r.y < rand.boven - 60) this.uitschakelen(r);
+    }
+    const levend = this.renners.filter(r => !r.dood);
+    // de ronde loopt door tot er één over is, ook als jij al af bent (je kijkt dan mee met de koploper)
+    if (this.fase === 'race' && levend.length <= 1) {
+      this.fase = 'uitloop';
+      const winnaar = levend[0];
+      this.stand.punten[winnaar ? winnaar.id : 0]++;
+      if (winnaar === this.speler) {
+        const sleutel = 'tp_record_' + this.opties.baan, oud = TP.lees(sleutel, null);
+        if (this.rondeTijd > 10 && (oud === null || oud < 10 || this.rondeTijd < oud)) { TP.bewaar(sleutel, this.rondeTijd); this.toonTussentijd('Nieuw record: ' + this.rondeTijd.toFixed(2)); }
+      }
+      this.toonMelding(winnaar === this.speler ? 'Jij wint de ronde!' : winnaar.naam + ' wint de ronde', 2.2, 84);
+      this.geluid.speel(winnaar === this.speler ? 'winst' : 'verlies', { volume: 0.6 });
+      this.time.delayedCall(1800, () => { this.geluid.stopVuur(); this.scene.start('Ronde', { ...this.opties, stand: this.stand, winnaar: winnaar ? winnaar.id : 0 }); });
+    }
+    // gloed en vuurgeluid op basis van afstand speler tot het front
+    const frontX = this.frontKant < 0 ? rand.links : rand.rechts;
+    const d = Math.abs(this.speler.x - frontX) * cam.zoom;
+    const nabij = Phaser.Math.Clamp(1 - d / 700, 0, 1);
+    this.gloed.setAlpha(nabij * 0.35);
+    this.geluid.vuurVolume(0.08 + nabij * 0.4);
+    this.frontX = frontX;
+  }
+
+  uitschakelen(r) {
+    r.dood = true;
+    if (r.kijk && r.kijk.sprite) {
+      const s = r.kijk.sprite;
+      this.tweens.add({ targets: s, alpha: 0, angle: -60, y: s.y - 80, duration: 450, onComplete: () => s.setVisible(false) });
+      r.kijk.naam && r.kijk.naam.setVisible(false); r.kijk.schaduw && r.kijk.schaduw.setVisible(false);
+    }
+    this.fx.rook && this.fx.rook.emitParticleAt(r.x, r.y - 60, 10);
+    this.geluid.speel(r.isSpeler ? 'dood' : 'uit');
+    if (r.isSpeler) { this.cameras.main.shake(400, 0.014); this.cameras.main.flash(300, 255, 120, 30); this.toonMelding('Gepakt door het vuur!', 2.0, 92); this.gloed.setAlpha(0.6); }
+    else this.toonTussentijd(r.naam + ' is gepakt');
+  }
+
+  // ---------------------------------------------------------------- tekenen
+  tekenAlles(dt) {
+    const cam = this.cameras.main;
+    const z = cam.zoom;
+    for (const l of this.lagen) {
+      l.ts.tilePositionX = (cam.scrollX * l.f) / l.schaal;
+      l.ts.y = l.basisY - (cam.scrollY - (this.baanDef.start.y - 760)) * l.fy;
+    }
+    // gloed aan de rand waar de meute vandaan komt, met een korte overgang als de kant wisselt
+    if (this.frontGloed) {
+      const doelAlpha = this.frontKantBeeld === this.frontKant ? 1 : 0;
+      this.frontAlpha = Phaser.Math.Linear(this.frontAlpha, doelAlpha, 1 - Math.exp(-6 * dt));
+      if (this.frontAlpha < 0.05 && this.frontKantBeeld !== this.frontKant) { this.frontKantBeeld = this.frontKant; }
+      const kant = this.frontKantBeeld === undefined ? this.frontKant : this.frontKantBeeld;
+      const puls = 1 + Math.sin(this.tijd * 5) * 0.08;
+      this.frontGloed.setScale(kant > 0 ? -puls : puls, 1);
+      this.front.setPosition(kant > 0 ? TP.W - TP.CAMERA.frontMarge : TP.CAMERA.frontMarge, 0);
+      this.front.setAlpha(this.frontAlpha);
+    }
+    if (this.fx.vonken && this.frontX !== undefined && this.fase !== 'aftel') {
+      const rand = this.beeldRand();
+      const kant = this.frontKant;
+      for (let i = 0; i < 3; i++) this.fx.vonken.emitParticleAt(this.frontX - kant * Math.random() * 120, rand.boven + Math.random() * (rand.onder - rand.boven), 1);
+      if (Math.random() < 0.35) this.fx.rook.emitParticleAt(this.frontX - kant * Math.random() * 60, rand.boven + Math.random() * (rand.onder - rand.boven), 1);
+    }
+    for (const r of this.renners) {
+      this.tekenRenner(r, dt);
+      this.verwerkGebeurtenissen(r);
+    }
+    this.touw.clear();
+    for (const r of this.renners) {
+      if (!r.haak) continue;
+      this.touw.lineStyle(7, 0x3a2412, 1).lineBetween(r.x + r.richting * 10, r.handY(), r.haak.anker.x, r.haak.anker.y);
+      this.touw.lineStyle(3, 0xa8743c, 1).lineBetween(r.x + r.richting * 10, r.handY(), r.haak.anker.x, r.haak.anker.y);
+      this.touw.fillStyle(0xffd23f, 1).fillCircle(r.haak.anker.x, r.haak.anker.y, 9);
+    }
+    // hud
+    const sp = this.speler;
+    this.hudTijd.setText(this.rondeTijd.toFixed(1));
+    const levend = this.renners.filter(r => !r.dood);
+    const plek = 1 + levend.filter(r => r.vooruit > sp.vooruit).length;
+    this.hudPlek.setText(sp.dood ? 'Uit' : plek + 'e');
+    this.hudPlekSub.setText(levend.length + ' in de race');
+    this.hudRondje.setText('rondje ' + (Math.floor(Math.max(0, sp.vooruit) / this.baan.lengte) + 1));
+    this.hudStand.setText(this.stand.namen.map((n, i) => n + ' ' + '●'.repeat(this.stand.punten[i]) + '○'.repeat(TP.WEDSTRIJD.rondesNodig - this.stand.punten[i])).join('   '));
+    if (sp.item && TP.heeft('item_' + sp.item)) { const i = TP.manifest.beelden['item_' + sp.item]; this.itemPop = Math.max(0, (this.itemPop || 0) - dt); const pop = 1 + Math.sin(Math.min(1, this.itemPop / 0.5) * Math.PI) * 0.6; this.hudItemBeeld.setTexture('item_' + sp.item).setScale(76 / Math.max(i.w, i.h) * pop).setVisible(true); } else this.hudItemBeeld.setVisible(false);
+    this.hudItemTekst.setText(sp.item ? TP.ITEMS[sp.item].naam : (sp.schild ? 'Bladschild' : 'geen item'));
+    this.hudItemHint.setText(sp.item ? 'X  gebruiken' : 'X  item').setColor(sp.item && Math.floor(this.tijd * 3) % 2 ? '#ffd23f' : '#d9c9a8');
+    const af = sp.t.dashAfkoel / TP.FYS.dashAfkoel;
+    this.hudDashSchaduw.clear();
+    if (af > 0) { this.hudDashSchaduw.fillStyle(0x000000, 0.55).slice(TP.W / 2 - 120, TP.H - 80, 46, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * af, false).fillPath(); }
+    this.hudDashTekst.setText(af > 0 ? Math.ceil(sp.t.dashAfkoel) : 'DASH');
+    this.hudDashSub.setText(af > 0 ? 'Z  laden' : 'Z  klaar');
+    this.hudSnelheid.setText(Math.round(Math.abs(sp.vx) / 10) + ' km/u');
+    if (this.tips) {
+      this.tipTimer -= dt;
+      if (this.tipTimer <= 0) { this.tipIndex++; if (this.tipIndex >= this.tips.length) { this.tips = null; this.tipPaneel.setVisible(false); this.tipTekst.setVisible(false); } else { this.tipTekst.setText(this.tips[this.tipIndex]); this.tipTimer = 5.5; } }
+    }
+    // rondetelling van de speler
+    const ronde = Math.floor(sp.vooruit / this.baan.lengte);
+    if (ronde > this.rondeNr && this.fase === 'race') { this.rondeNr = ronde; this.toonTussentijd('Rondje ' + ronde + ' · ' + this.rondeTijd.toFixed(2)); this.geluid.speel('tussentijd'); }
+    if (this.debug) this.tekenDebug();
+  }
+
+  tekenRenner(r, dt) {
+    const k = r.kijk;
+    if (!k || !k.sprite) return;
+    const s = k.sprite, p = k.rol;
+    s.setPosition(r.x, r.y + 4);
+    s.setFlipX(r.richting < 0);
+    let pose = null, anim = null;
+    if (r.dood) return;
+    if (r.t.verdoofd > 0 && TP.heeft(p + '_geraakt')) pose = p + '_geraakt';
+    else if (r.haak && TP.heeft(p + '_slinger')) pose = p + '_slinger';
+    else if (r.aanMuur && !r.opGrond && TP.heeft(p + '_muur')) pose = p + '_muur';
+    else if (r.slidet && TP.heeft(p + '_slide')) pose = p + '_slide';
+    else if (!r.opGrond && r.vy < -50 && TP.heeft(p + '_sprong')) pose = p + '_sprong';
+    else if (!r.opGrond && r.vy >= -50 && TP.heeft(p + '_val')) pose = p + '_val';
+    else if (r.opGrond && Math.abs(r.vx) > 40 && TP.heeft(p + '_ren')) anim = p + '_ren';
+    else if (TP.heeft(p + '_ren')) { pose = p + '_ren'; }
+    else pose = p + '_ref';
+    if (anim) {
+      if (k.huidig !== anim) { s.play(anim); k.huidig = anim; }
+      s.anims.timeScale = Phaser.Math.Clamp(Math.abs(r.vx) / 700, 0.5, 2.0);
+    } else if (pose && k.huidig !== pose) {
+      s.stop(); s.setTexture(pose, 0); k.huidig = pose;
+    }
+    // bij de muur kijkt de vos van de muur af; het muurbeeld zelf leunt naar rechts
+    if (pose === p + '_muur') s.setFlipX(r.aanMuur < 0);
+    const basis = this.schaal[r.rol] || 1;
+    let sx = 1, sy = 1;
+    if (!r.opGrond && !r.haak) { const v = Phaser.Math.Clamp(r.vy / 1600, -1, 1); sy = 1 + Math.abs(v) * 0.12; sx = 1 - Math.abs(v) * 0.08; }
+    if (r.t.landSquash > 0) { r.t.landSquash -= dt; const q = r.t.landSquash / 0.12; sy = 1 - 0.18 * q; sx = 1 + 0.14 * q; }
+    s.setScale(basis * sx, basis * sy);
+    s.setRotation(r.opGrond ? r.hoek * 0.6 : (r.haak ? Phaser.Math.Clamp(r.vx / 2500, -0.5, 0.5) : 0));
+    const basisTint = k.tint || 0xffffff;
+    if (r.t.verdoofd > 0) s.setTint(Math.floor(this.tijd * 20) % 2 ? 0xff9977 : basisTint); else if (r.t.bevroren > 0) s.setTint(0x9fd8ff); else if (r.t.boost > 0 || r.t.dash > 0) s.setTint(0xfff0c0); else s.setTint(basisTint);
+    if (k.schaduw) { const g = this.baan.grondOnder(r.x, r.y, 0, 600, false); k.schaduw.setPosition(r.x, g ? g.y : r.y).setVisible(!!g).setScale(1 - Math.min(0.5, (g ? g.y - r.y : 0) / 1000), 1); }
+    if (k.naam) k.naam.setPosition(r.x, r.y - r.hoogte - 30);
+    if (r.slidet && r.opGrond && this.fx.slideStof && Math.random() < 0.6) this.fx.slideStof.emitParticleAt(r.x - r.richting * 20, r.y, 1);
+    if ((r.t.boost > 0 || r.t.dash > 0 || Math.abs(r.vx) > 1250) && this.fx.strepen && Math.random() < 0.7) this.fx.strepen.emitParticleAt(r.x - r.richting * 40, r.y - 60 - Math.random() * 60, 1);
+    if (r.opGrond && Math.abs(r.vx) > 300 && this.fx.stof && Math.random() < 0.12) this.fx.stof.emitParticleAt(r.x - r.richting * 30, r.y, 1);
+  }
+
+  verwerkGebeurtenissen(r) {
+    const dichtbij = r.isSpeler ? 1 : Phaser.Math.Clamp(1 - Math.hypot(r.x - this.speler.x, r.y - this.speler.y) / 2500, 0.1, 0.6);
+    for (const e of r.gebeurtenissen) {
+      const n = e.naam;
+      if (n === 'land' || n === 'landHard') { r.t.landSquash = 0.12; this.fx.stof && this.fx.stof.emitParticleAt(r.x, r.y, n === 'landHard' ? 10 : 4); this.speelFx('fx_stof', r.x, r.y, 0.25); if (n === 'landHard' && r.isSpeler) this.cameras.main.shake(80, 0.003); }
+      if (n === 'sprong' || n === 'dubbelesprong' || n === 'muursprong') { this.fx.stof && this.fx.stof.emitParticleAt(r.x, r.y, 3); }
+      if (n === 'klap') { this.fx.inslag && this.fx.inslag.emitParticleAt(r.x, r.y - 70, 12); this.speelFx('fx_inslag', r.x, r.y - 60, 0.4); if (r.isSpeler) this.cameras.main.shake(140, 0.006); }
+      if (n === 'boost' || n === 'boostplaat' || n === 'dash') { this.fx.boost && this.fx.boost.emitParticleAt(r.x, r.y - 60, 14); this.speelFx('fx_boost', r.x, r.y - 40, 0.35); if (n === 'dash' && r.isSpeler) { this.toonTussentijd('Dash!'); this.cameras.main.shake(90, 0.003); } }
+      if (n === 'rakelings') { this.fx.inslag && this.fx.inslag.emitParticleAt(r.x, r.y - 60, 4); if (r.isSpeler) this.toonTussentijd('Rakelings!'); }
+      if (n === 'stamp') { this.fx.inslag && this.fx.inslag.emitParticleAt(r.x, r.y, 8); }
+      if (n === 'haak') { this.fx.inslag && this.fx.inslag.emitParticleAt(r.haak ? r.haak.anker.x : r.x, r.haak ? r.haak.anker.y : r.y, 5); }
+      const geluidNaam = { boostplaat: 'boost', geduwd: 'kop' }[n] || n;
+      this.geluid.speel(geluidNaam, { volume: 0.5 * dichtbij });
+    }
+    r.gebeurtenissen.length = 0;
+  }
+
+  tekenDebug() {
+    const g = this.debugG; g.clear();
+    for (const s of this.baan.grond) { g.lineStyle(3, s.oneWay ? 0x66aaff : 0x00ff88, 1); g.lineBetween(s.x1, s.y1, s.x2, s.y2); }
+    g.lineStyle(2, 0xff8800, 1);
+    for (const b of this.baan.blokken) g.strokeRect(b.x, b.y, b.w, b.h);
+    g.fillStyle(0xffff00, 1);
+    for (const a of this.baan.ankers) g.fillCircle(a.x, a.y, 10);
+    for (const o of this.baan.objecten) { if (!o.levend || o.type === 'decor') continue; g.lineStyle(2, o.type === 'vijand' ? 0xff00ff : o.type === 'krat' ? 0xffff00 : 0xff4444, 1); g.strokeRect(o.x - o.w / 2, o.y - o.h, o.w, o.h); }
+    for (const r of this.renners) { if (r.dood) continue; g.lineStyle(2, r.isSpeler ? 0xffffff : 0xaaaaaa, 1); g.strokeRect(r.x - r.breedte / 2, r.y - r.hoogte, r.breedte, r.hoogte); }
+    for (const q of this.baan.cues) { g.fillStyle(q.route === 'expert' ? 0xff44ff : q.route === 'gevaar' ? 0xffaa00 : 0x44ff44, 0.8); g.fillCircle(q.x, (q.y !== undefined ? q.y : this.baanDef.start.y) - 20, 6); }
+    const rand = this.beeldRand();
+    g.lineStyle(4, 0xff0000, 1); g.lineBetween(this.frontX || rand.links, rand.boven, this.frontX || rand.links, rand.onder);
+  }
+};

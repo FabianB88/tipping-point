@@ -1,0 +1,72 @@
+# Alleen wat de game laadt gaat mee; de grote bronpakketten en GPT-originelen blijven lokaal.
+tipping-point-project.zip
+assets/gpt/
+assets/gratis/*
+!assets/gratis/LilitaOne-Regular.ttf
+!assets/gratis/TitanOne-Regular.ttf
+!assets/gratis/kenney_particle-pack/
+assets/gratis/kenney_particle-pack/*
+!assets/gratis/kenney_particle-pack/PNG (Transparent)/
+assets/gratis/kenney_particle-pack/PNG (Transparent)/*
+!assets/gratis/kenney_particle-pack/PNG (Transparent)/smoke_04.png
+!assets/gratis/kenney_particle-pack/PNG (Transparent)/spark_04.png
+!assets/gratis/kenney_particle-pack/PNG (Transparent)/trace_01.png
+!assets/gratis/kenney_particle-pack/PNG (Transparent)/star_06.png
+!assets/gratis/kenney_particle-pack/PNG (Transparent)/circle_05.png
+!assets/gratis/audio/
+assets/gratis/audio/*
+!assets/gratis/audio/digital-audio/
+assets/gratis/audio/digital-audio/*
+!assets/gratis/audio/digital-audio/Audio/
+assets/gratis/audio/digital-audio/Audio/*
+!assets/gratis/audio/impact-sounds/
+assets/gratis/audio/impact-sounds/*
+!assets/gratis/audio/impact-sounds/Audio/
+assets/gratis/audio/impact-sounds/Audio/*
+!assets/gratis/audio/interface-sounds/
+assets/gratis/audio/interface-sounds/*
+!assets/gratis/audio/interface-sounds/Audio/
+assets/gratis/audio/interface-sounds/Audio/*
+!assets/gratis/audio/music-jingles/
+assets/gratis/audio/music-jingles/*
+!assets/gratis/audio/music-jingles/Audio/
+assets/gratis/audio/music-jingles/Audio/*
+!assets/gratis/audio/music-jingles/Audio/8-Bit jingles/
+assets/gratis/audio/music-jingles/Audio/8-Bit jingles/*
+!assets/gratis/audio/music-jingles/Audio/Sax jingles/
+assets/gratis/audio/music-jingles/Audio/Sax jingles/*
+!assets/gratis/audio/digital-audio/Audio/laser4.ogg
+!assets/gratis/audio/digital-audio/Audio/lowDown.ogg
+!assets/gratis/audio/digital-audio/Audio/lowThreeTone.ogg
+!assets/gratis/audio/digital-audio/Audio/phaseJump1.ogg
+!assets/gratis/audio/digital-audio/Audio/phaseJump3.ogg
+!assets/gratis/audio/digital-audio/Audio/phaserUp2.ogg
+!assets/gratis/audio/digital-audio/Audio/phaserUp4.ogg
+!assets/gratis/audio/digital-audio/Audio/powerUp4.ogg
+!assets/gratis/audio/digital-audio/Audio/powerUp7.ogg
+!assets/gratis/audio/digital-audio/Audio/threeTone1.ogg
+!assets/gratis/audio/digital-audio/Audio/tone1.ogg
+!assets/gratis/audio/digital-audio/Audio/twoTone1.ogg
+!assets/gratis/audio/impact-sounds/Audio/footstep_grass_000.ogg
+!assets/gratis/audio/impact-sounds/Audio/footstep_grass_001.ogg
+!assets/gratis/audio/impact-sounds/Audio/footstep_grass_002.ogg
+!assets/gratis/audio/impact-sounds/Audio/footstep_wood_001.ogg
+!assets/gratis/audio/impact-sounds/Audio/impactGeneric_light_000.ogg
+!assets/gratis/audio/impact-sounds/Audio/impactGeneric_light_003.ogg
+!assets/gratis/audio/impact-sounds/Audio/impactGlass_light_002.ogg
+!assets/gratis/audio/impact-sounds/Audio/impactMetal_light_001.ogg
+!assets/gratis/audio/impact-sounds/Audio/impactPlank_medium_000.ogg
+!assets/gratis/audio/impact-sounds/Audio/impactPlank_medium_002.ogg
+!assets/gratis/audio/impact-sounds/Audio/impactPlank_medium_003.ogg
+!assets/gratis/audio/interface-sounds/Audio/click_001.ogg
+!assets/gratis/audio/interface-sounds/Audio/confirmation_001.ogg
+!assets/gratis/audio/interface-sounds/Audio/drop_002.ogg
+!assets/gratis/audio/interface-sounds/Audio/error_002.ogg
+!assets/gratis/audio/interface-sounds/Audio/error_005.ogg
+!assets/gratis/audio/interface-sounds/Audio/glass_002.ogg
+!assets/gratis/audio/interface-sounds/Audio/minimize_003.ogg
+!assets/gratis/audio/interface-sounds/Audio/pluck_001.ogg
+!assets/gratis/audio/interface-sounds/Audio/scratch_002.ogg
+!assets/gratis/audio/interface-sounds/Audio/select_001.ogg
+!assets/gratis/audio/music-jingles/Audio/8-Bit jingles/jingles_NES09.ogg
+!assets/gratis/audio/music-jingles/Audio/Sax jingles/jingles_SAX00.ogg

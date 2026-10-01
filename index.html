@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tipping Point</title>
+<style>
+  @font-face { font-family: 'Lilita One'; src: url('assets/gratis/LilitaOne-Regular.ttf') format('truetype'); }
+  @font-face { font-family: 'Titan One'; src: url('assets/gratis/TitanOne-Regular.ttf') format('truetype'); }
+  html, body { margin: 0; height: 100%; background: #120a04; overflow: hidden; }
+  body { user-select: none; }
+  #spel { width: 100%; height: 100%; }
+  #fontlader { position: absolute; left: -9999px; top: 0; font-family: 'Lilita One'; }
+  #fontlader b { font-family: 'Titan One'; }
+</style>
+</head>
+<body>
+<div id="spel"></div>
+<div id="fontlader">laden<b>laden</b></div>
+<script src="lib/phaser.min.js"></script>
+<script>
+  // Scripts met versiestempel laden (anders blijft de browser oude code gebruiken), in vaste volgorde.
+  const SCRIPTS = ["src/config.js", "src/vragen.js", "src/geluid.js", "src/laden.js", "src/invoer.js", "src/baan.js", "src/renner.js", "src/bots.js", "src/banen/bos1.js", "src/race.js", "src/schermen.js"];
+  const V = Date.now();
+  function laadScripts(lijst) {
+    return lijst.reduce((p, src) => p.then(() => new Promise((ok, fout) => { const s = document.createElement('script'); s.src = src + '?v=' + V; s.onload = ok; s.onerror = fout; document.body.appendChild(s); })), Promise.resolve());
+  }
+</script>
+<script>
+  // Eerst het manifest en de lettertypen, dan pas het spel (anders meet Phaser de tekst verkeerd).
+  const fonts = document.fonts ? document.fonts.load("20px 'Lilita One'").then(() => document.fonts.load("20px 'Titan One'")) : Promise.resolve();
+  const manifest = fetch('assets/manifest.json?' + Date.now()).then(r => r.ok ? r.json() : null).catch(() => null);
+  Promise.all([fonts.catch(() => null), manifest, laadScripts(SCRIPTS)]).then(([, m]) => {
+    if (m) TP.manifest = m;
+    const s = document.createElement('script'); s.src = 'src/main.js?v=' + V; document.body.appendChild(s);
+  });
+</script>
+</body>
+</html>
