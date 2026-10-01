@@ -665,6 +665,20 @@ TP.Race = class extends Phaser.Scene {
       this.tipTimer -= dt;
       if (this.tipTimer <= 0) { this.tipIndex++; if (this.tipIndex >= this.tips.length) { this.tips = null; this.tipPaneel.setVisible(false); this.tipTekst.setVisible(false); } else { this.tipTekst.setText(this.tips[this.tipIndex]); this.tipTimer = 5.5; } }
     }
+    // vastloop-detector voor de speler: richting ingedrukt maar geen vaart -> laat zien waarom
+    const inp = sp.laatsteInvoer || {};
+    if (!sp.dood && this.fase === 'race' && inp.x !== 0 && Math.abs(sp.vx) < 150) this.stilTijd = (this.stilTijd || 0) + dt; else this.stilTijd = 0;
+    if (this.stilTijd > 1.5) {
+      const T = sp.t;
+      const redenen = [];
+      if (T.verdoofd > 0) redenen.push('verdoofd'); if (T.bevroren > 0) redenen.push('bevroren'); if (T.traag > 0) redenen.push('honing'); if (T.grip > 0) redenen.push('olie');
+      if (sp.haak) redenen.push('aan de haak'); if (sp.slidet) redenen.push('slide'); if (sp.aanMuur) redenen.push('tegen muur'); if (!sp.opGrond) redenen.push('in de lucht');
+      const blok = this.baan.blokkenIn(sp.x - 60, sp.y - sp.hoogte - 10, sp.x + 60, sp.y + 5)[0];
+      if (blok) redenen.push('blok ' + Math.round(blok.x) + ',' + Math.round(blok.y) + ' ' + blok.w + 'x' + blok.h);
+      const tekst = 'VAST: ' + (redenen.join(', ') || 'geen reden gevonden') + ' | x=' + Math.round(sp.x) + ' y=' + Math.round(sp.y) + ' vx=' + Math.round(sp.vx) + ' invoer=' + inp.x + (inp.springVast ? ' spring' : '') + (inp.slide ? ' slide' : '') + (inp.haak ? ' haak' : '');
+      this.hudTussen.setText(tekst).setAlpha(1).setColor('#ff9b6a');
+      if (!this.stilGelogd) { console.warn(tekst); this.stilGelogd = true; }
+    } else if (this.stilTijd === 0) this.stilGelogd = false;
     // rondetelling van de speler
     const ronde = Math.floor(sp.vooruit / this.baan.lengte);
     if (ronde > this.rondeNr && this.fase === 'race') { this.rondeNr = ronde; this.toonTussentijd('Rondje ' + ronde + ' · ' + this.rondeTijd.toFixed(2)); this.geluid.speel('tussentijd'); }
